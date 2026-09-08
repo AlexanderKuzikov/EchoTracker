@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { api, type Card, type Column, type User } from './api';
 import { baseName, bpmnToSvg, docxToMarkdown, svgToPng } from './derivatives';
+import { renderMarkdown } from './md';
 
 const BpmnView = lazy(() => import('./BpmnView'));
 
@@ -175,6 +176,9 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
               {f.mime === 'application/pdf' && (
                 <div><iframe className="previewdoc" src={api.fileUrl(f.id)} title={f.orig_name} /></div>
               )}
+              {(f.mime === 'text/plain' || f.orig_name.toLowerCase().endsWith('.txt')) && (
+                <TxtPreview id={f.id} />
+              )}
             </li>
           ))}
         </ul>
@@ -197,6 +201,22 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
 }
 
 function MdPreview({ id, name }: { id: string; name: string }) {
+  const [html, setHtml] = useState('');
+  useEffect(() => {
+    fetch(api.fileUrl(id), { credentials: 'same-origin' })
+      .then((r) => r.text())
+      .then((t) => setHtml(renderMarkdown(t)))
+      .catch(() => setHtml(''));
+  }, [id]);
+  return (
+    <div>
+      <h4>{name}</h4>
+      <div className="mdview" dangerouslySetInnerHTML={{ __html: html }} />
+    </div>
+  );
+}
+
+function TxtPreview({ id }: { id: string }) {
   const [text, setText] = useState('');
   useEffect(() => {
     fetch(api.fileUrl(id), { credentials: 'same-origin' })
@@ -204,12 +224,7 @@ function MdPreview({ id, name }: { id: string; name: string }) {
       .then(setText)
       .catch(() => setText(''));
   }, [id]);
-  return (
-    <div>
-      <h4>{name}</h4>
-      <pre className="mdview">{text}</pre>
-    </div>
-  );
+  return <pre className="mdview">{text}</pre>;
 }
 
 function BpmnTextView({ id }: { id: string }) {

@@ -80,9 +80,24 @@ const ALLOWED_MIME = new Set([
   'image/webp',
   'image/svg+xml',
   'application/pdf',
+  'application/xml',
+  'text/xml',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/markdown',
+  'text/plain',
 ]);
+const EXT_MIME: Record<string, string> = {
+  '.bpmn': 'application/xml',
+  '.md': 'text/markdown',
+  '.txt': 'text/plain',
+  '.pdf': 'application/pdf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+};
 const FILE_KINDS = new Set(['original', 'md', 'svg', 'thumb']);
 
 function log(s: string): void {
@@ -252,6 +267,7 @@ const MIME_STATIC: Record<string, string> = {
   '.map': 'application/json',
   '.bpmn': 'application/xml',
   '.md': 'text/markdown; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
 };
 
 const webRoot = fileURLToPath(new URL('../../web/dist', import.meta.url));
@@ -620,7 +636,15 @@ const server = createServer(async (req, res) => {
         }
         const kindRaw = parts.find((p) => p.name === 'kind')?.data.toString('utf8').trim() ?? 'original';
         const kind = FILE_KINDS.has(kindRaw) ? kindRaw : 'original';
-        const mime = file.mime || 'application/octet-stream';
+        let mime = file.mime || 'application/octet-stream';
+        if (mime === 'application/octet-stream') {
+          const byExt = EXT_MIME[extname(file.filename ?? '').toLowerCase()];
+          if (!byExt) {
+            fail(res, 415, 'mime not allowed: application/octet-stream');
+            return;
+          }
+          mime = byExt;
+        }
         if (!ALLOWED_MIME.has(mime)) {
           fail(res, 415, `mime not allowed: ${mime}`);
           return;
