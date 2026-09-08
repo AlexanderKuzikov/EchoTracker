@@ -16,7 +16,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
   const [showBpmn, setShowBpmn] = useState(false);
-  const [draft, setDraft] = useState({ title: '', body: '', kind: 'task', column_id: '', assignee_id: '', deadline: '', requested_at: '' });
+  const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '' });
 
   useEffect(() => {
     api
@@ -116,7 +116,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
         <div className="grid2">
           <label>
             Тип
-            <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value })}>
+            <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as 'task' | 'request' })}>
               <option value="task">Задача</option>
               <option value="request">Запрос</option>
             </select>

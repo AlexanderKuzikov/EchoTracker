@@ -148,7 +148,7 @@ export async function pumpOutbox(
        WHERE status IN ('queued', 'failed') AND next_try <= ? AND attempts < 5
        ORDER BY created_at LIMIT 10`,
     )
-    .all(Date.now()) as OutboxRow[];
+    .all(Date.now()) as unknown as OutboxRow[];
   for (const r of rows) {
     try {
       await sendMail(env, r.to_addr, r.subject, r.body);

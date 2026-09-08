@@ -395,7 +395,7 @@ const server = createServer(async (req, res) => {
           `SELECT c.*, u.login AS assignee_login, u.email AS assignee_email FROM cards c
            LEFT JOIN users u ON u.id = c.assignee_id WHERE ${v.sql} ORDER BY c.updated_at DESC`,
         )
-        .all(...v.params) as CardRow[];
+        .all(...v.params) as unknown as CardRow[];
       json(res, 200, rows.map(withComputed));
       return;
     }
@@ -487,7 +487,7 @@ const server = createServer(async (req, res) => {
           return;
         }
         const sets: string[] = [];
-        const params: unknown[] = [];
+        const params: Array<string | number | null> = [];
         if (b.title !== undefined) {
           if (!b.title.trim()) {
             fail(res, 400, 'empty title');
