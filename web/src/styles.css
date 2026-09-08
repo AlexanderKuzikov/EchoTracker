@@ -106,6 +106,104 @@ button.link {
   margin-bottom: 8px;
 }
 
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.viewswitch {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.viewswitch button {
+  border: 0;
+  border-radius: 0;
+}
+
+.viewswitch button.on {
+  background: #23211c;
+  color: #fff;
+}
+
+.calnav {
+  align-items: center;
+}
+
+.caltitle {
+  text-transform: capitalize;
+  min-width: 160px;
+  text-align: center;
+}
+
+.calgrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.caldow {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 4px 0;
+}
+
+.calday {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 88px;
+  padding: 6px;
+}
+
+.calday.other {
+  opacity: 0.45;
+}
+
+.calday.today {
+  outline: 2px solid var(--accent);
+}
+
+.calnum {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.ev {
+  font-size: 12px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.ev.due {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: #fdecea;
+}
+
+.ev.start {
+  color: var(--muted);
+}
+
+.ev.wait {
+  color: var(--wait);
+  border-color: var(--wait);
+  background: #fdf6e3;
+}
+
 .composer {
   display: grid;
   grid-template-columns: 1fr 140px auto;

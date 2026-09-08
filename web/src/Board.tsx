@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { api, type Card, type Column, type User } from './api';
-import CardModalHost from './CardModal';
 
-function initials(login: string): string {
+export function initials(login: string): string {
   const clean = login.replace(/[^a-zA-Zа-яА-ЯёЁ0-9]/g, '').slice(0, 2).toUpperCase();
   return clean || '?';
 }
@@ -23,19 +22,17 @@ function plural(n: number, one: string, few: string, many: string): string {
 
 interface Props {
   user: User;
-  users: User[];
   columns: Column[];
   cards: Card[];
   reload: () => void;
+  setOpenId: (id: string | null) => void;
 }
 
-export default function Board({ user, users, columns, cards, reload }: Props) {
+export default function Board({ user, columns, cards, reload, setOpenId }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState('task');
   const [err, setErr] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
-
   const byCol = (id: string) => cards.filter((c) => c.column_id === id);
   const canEdit = user.role === 'admin' || user.role === 'member';
 
@@ -136,9 +133,6 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
           </div>
         ))}
       </div>
-      {openId && (
-        <CardModalHost cardId={openId} users={users} columns={columns} onClose={() => { setOpenId(null); reload(); }} />
-      )}
     </div>
   );
 }

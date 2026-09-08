@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AuthError, api, type Card, type Column, type User } from './api';
-import Board from './Board';
+import Board, { initials } from './Board';
+import Calendar from './Calendar';
+import CardModalHost from './CardModal';
 
 const ROLE_NAMES: Record<string, string> = {
   admin: 'Администратор',
@@ -17,6 +19,8 @@ export default function App() {
   const [pass, setPass] = useState('');
   const [err, setErr] = useState('');
   const [ready, setReady] = useState(false);
+  const [view, setView] = useState<'board' | 'cal'>('board');
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [u, cols, list] = await Promise.all([api.users().catch(() => [] as User[]), api.columns(), api.cards()]);
@@ -75,18 +79,31 @@ export default function App() {
     <div className="wrap">
       <header className="topbar">
         <strong>EchoTracker</strong>
-        <span className="muted">
-          {me.login} · {ROLE_NAMES[me.role] ?? me.role}
+        <span className="who" title="Твой логин">
+          <span className="avatar">{initials(me.login)}</span>
+          {me.login}
         </span>
+        <span className="badge" title="Твоя роль">{ROLE_NAMES[me.role] ?? me.role}</span>
         <button
           className="link"
           onClick={() => api.logout().then(() => setMe(null))}
         >
           Выйти
         </button>
+        <span className="viewswitch">
+          <button className={view === 'board' ? 'on' : ''} onClick={() => setView('board')}>Доска</button>
+          <button className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>Календарь</button>
+        </span>
       </header>
       {err && <div className="error">{err}</div>}
-      <Board user={me} users={users} columns={columns} cards={cards} reload={() => load().catch(() => undefined)} />
+      {view === 'board' ? (
+        <Board user={me} columns={columns} cards={cards} reload={() => load().catch(() => undefined)} setOpenId={setOpenId} />
+      ) : (
+        <Calendar cards={cards} onOpen={setOpenId} />
+      )}
+      {openId && (
+        <CardModalHost cardId={openId} users={users} columns={columns} onClose={() => { setOpenId(null); load().catch(() => undefined); }} />
+      )}
       {me.role === 'admin' && <AdminPanel users={users} reload={load} />}
     </div>
   );
