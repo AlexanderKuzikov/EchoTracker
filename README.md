@@ -29,6 +29,8 @@ pnpm install
 pnpm dev   # api 127.0.0.1:8100/echo + web 127.0.0.1:5174/echo (занят — подберёт свободный)
 ```
 
+Удобно: `dev.bat` даблкликом или задача `Echo: dev` из VS Code (Ctrl+Shift+P → Tasks: Run Task).
+
 ## Встройка в проект
 
 ```powershell

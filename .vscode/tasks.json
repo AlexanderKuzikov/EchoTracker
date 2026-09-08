@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Echo: dev",
+      "detail": "api + web одной командой",
+      "type": "shell",
+      "command": "pnpm dev",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "close": false
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}
