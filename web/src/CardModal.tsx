@@ -359,29 +359,73 @@ function Feed({ card, refresh }: { card: Card; refresh: () => Promise<void> }) {
 
 function MdPreview({ id, name }: { id: string; name: string }) {
   const [html, setHtml] = useState('');
+  const [raw, setRaw] = useState('');
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     fetch(api.fileUrl(id), { credentials: 'same-origin' })
       .then((r) => r.text())
-      .then((t) => setHtml(renderMarkdown(t)))
+      .then((t) => {
+        setRaw(t);
+        setHtml(renderMarkdown(t));
+      })
       .catch(() => setHtml(''));
   }, [id]);
   return (
     <div>
-      <h4>{name}</h4>
+      <h4>
+        {name} <button className="link" onClick={() => copyText(raw).then((ok) => flash(ok, setCopied))}>Копировать</button>
+        {copied && <span className="muted"> — скопировано</span>}
+      </h4>
       <div className="mdview" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
 }
 
+function flash(ok: boolean, set: (v: boolean) => void): void {
+  if (!ok) return;
+  set(true);
+  setTimeout(() => set(false), 2000);
+}
+
+async function copyText(t: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(t);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 function TxtPreview({ id }: { id: string }) {
   const [text, setText] = useState('');
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     fetch(api.fileUrl(id), { credentials: 'same-origin' })
       .then((r) => r.text())
       .then(setText)
       .catch(() => setText(''));
   }, [id]);
-  return <pre className="mdview">{text}</pre>;
+  return (
+    <div>
+      <div>
+        <button className="link" onClick={() => copyText(text).then((ok) => flash(ok, setCopied))}>Копировать</button>
+        {copied && <span className="muted"> — скопировано</span>}
+      </div>
+      <pre className="mdview">{text}</pre>
+    </div>
+  );
 }
 
 function BpmnTextView({ id }: { id: string }) {
