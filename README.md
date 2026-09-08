@@ -36,7 +36,7 @@ pnpm dev   # api 127.0.0.1:8100/echo + web 127.0.0.1:5174/echo (занят — �
 ```
 
 Caddy рядом с проектом: `handle /echo/* { reverse_proxy 127.0.0.1:8100 }`.
-В `.env` копии: `ECHO_BASE=/echo/`, `BASE_URL=https://<домен>/echo`, доки берутся из `../docs` сами.
+В `.env` копии: `ECHO_BASE=/echo/`, `BASE_URL=https://<домен>/echo`, доки берутся из `../../docs` сами.
 
 ## Документация
 

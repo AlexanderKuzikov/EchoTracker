@@ -54,7 +54,7 @@ const env = {
   base: normBase(process.env['ECHO_BASE']),
   dataDir: process.env['DATA_DIR'] ?? './data',
   uploadsDir: process.env['UPLOADS_DIR'] ?? './uploads',
-  docsDir: process.env['DOCS_DIR'] ?? '../docs',
+  docsDir: process.env['DOCS_DIR'] ?? '../../docs',
   adminLogin: process.env['ADMIN_LOGIN'] ?? '',
   adminPass: process.env['ADMIN_PASS'] ?? '',
   adminEmail: process.env['ADMIN_EMAIL'] ?? '',
