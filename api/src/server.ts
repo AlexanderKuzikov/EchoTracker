@@ -501,7 +501,7 @@ const server = createServer(async (req, res) => {
           email: string | null;
         };
         if (u?.email) {
-          enqueue(db, u.email, `Новая карточка ${code}: ${b.title.trim()}`, `Тебе назначили ${code} «${b.title.trim()}».\n${baseUrl()}/#${id}`);
+          enqueue(db, u.email, `Новая карточка: ${b.title.trim()}`, `Тебе назначили «${b.title.trim()}».\n${baseUrl()}/#${id}`);
         }
       }
       const created = getCard(id);
@@ -580,7 +580,7 @@ const server = createServer(async (req, res) => {
               email: string | null;
             };
             if (u?.email) {
-              enqueue(db, u.email, `Назначена карточка ${card.code}: ${card.title}`, `Тебе назначили ${card.code} «${card.title}».\n${baseUrl()}/#${card.id}`);
+              enqueue(db, u.email, `Назначена карточка: ${card.title}`, `Тебе назначили «${card.title}».\n${baseUrl()}/#${card.id}`);
             }
           }
         }
