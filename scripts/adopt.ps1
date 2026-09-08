@@ -4,7 +4,7 @@ param([Parameter(Mandatory = $true)][string]$Target)
 $src = Split-Path -Parent $PSScriptRoot
 $dest = Join-Path $Target 'echo'
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-robocopy $src $dest /E /XD node_modules .git data uploads dist web\dist api\data /XF .env | Out-Null
+robocopy $src $dest /E /XD node_modules .git data uploads dist web\dist api\data .vscode /XF .env | Out-Null
 $ignore = Join-Path $Target '.gitignore'
 $lines = @('echo/data/', 'echo/uploads/', 'echo/.env')
 if (Test-Path -LiteralPath $ignore) {
