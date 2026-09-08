@@ -478,7 +478,9 @@ button.link {
 }
 
 .lightbox img {
-  max-width: none;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  object-fit: contain;
   background: #fff;
   border-radius: 8px;
 }
@@ -495,21 +497,21 @@ button.link {
 
 .mdview h1 {
   font-family: inherit;
-  font-weight: 700;
-  font-size: 17px;
+  font-weight: 600;
+  font-size: 16px;
   margin: 10px 0 6px;
 }
 
 .mdview h2 {
   font-family: inherit;
-  font-weight: 700;
-  font-size: 15px;
-  margin: 10px 0 6px;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 8px 0 4px;
 }
 
 .mdview h3 {
   font-family: inherit;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 14px;
   margin: 8px 0 4px;
 }
