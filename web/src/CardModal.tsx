@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { api, type Card, type CheckItem, type Column, type User } from './api';
-import { baseName, bpmnToSvg, docxToMarkdown, svgToPng } from './derivatives';
+import { baseName, bpmnToSvg, docxToMarkdown, hasBpmnLayout, svgHasContent, svgToPng } from './derivatives';
 import { renderMarkdown } from './md';
 
 const BpmnView = lazy(() => import('./BpmnView'));
@@ -15,6 +15,7 @@ interface Props {
 export default function CardModalHost({ cardId, users, columns, onClose }: Props) {
   const [card, setCard] = useState<Card | null>(null);
   const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState('');
   const [showBpmn, setShowBpmn] = useState(false);
   const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '', started_at: '' });
@@ -72,6 +73,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
   async function onPick(f: File) {
     if (!card) return;
     setErr('');
+    setNote('');
     setBusy('Загружаю…');
     try {
       const buf = await f.arrayBuffer();
@@ -84,10 +86,18 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
       } else if (low.endsWith('.bpmn')) {
         setBusy('Рисую схему…');
         const xml = new TextDecoder().decode(buf);
-        const svg = await bpmnToSvg(xml);
-        await api.uploadFile(card.id, new Blob([svg], { type: 'image/svg+xml' }), baseName(f.name) + '.svg', 'svg');
-        const png = await svgToPng(svg);
-        await api.uploadFile(card.id, png, baseName(f.name) + '.thumb.png', 'thumb');
+        if (!hasBpmnLayout(xml)) {
+          setNote('В bpmn нет раскладки — превью не построилось, смотри в Modeler');
+        } else {
+          const svg = await bpmnToSvg(xml);
+          if (!svgHasContent(svg)) {
+            setNote('Схема вышла пустой — проверь файл в Modeler');
+          } else {
+            await api.uploadFile(card.id, new Blob([svg], { type: 'image/svg+xml' }), baseName(f.name) + '.svg', 'svg');
+            const png = await svgToPng(svg);
+            await api.uploadFile(card.id, png, baseName(f.name) + '.thumb.png', 'thumb');
+          }
+        }
       }
       await refresh();
     } catch (e) {
@@ -172,6 +182,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           }}
         />
         {busy && <div className="busy">{busy}</div>}
+        {note && <div className="muted">{note}</div>}
         <ul className="files">
           {originals.map((f) => (
             <li key={f.id}>
@@ -197,6 +208,9 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
             <img className="previewwide" src={api.fileUrl(svg.id)} alt={svg.orig_name} />
             {bpmnSrc && !showBpmn && <div><button onClick={() => setShowBpmn(true)}>Открыть интерактивно</button></div>}
           </div>
+        )}
+        {!svg && bpmnSrc && (
+          <div className="muted">Превью схемы нет — перезалей bpmn, появится диагноз</div>
         )}
         {showBpmn && bpmnSrc && (
           <Suspense fallback={<div>Гружу вьювер…</div>}>
@@ -360,7 +374,7 @@ function BpmnTextView({ id }: { id: string }) {
       .catch(() => setXml(''));
   }, [id]);
   if (!xml) return <div>Загрузка…</div>;
-  if (!xml.includes('bpmn:definitions') && !xml.includes('<definitions')) {
+  if (!hasBpmnLayout(xml)) {
     return <div className="error">В файле нет раскладки — открой в Modeler</div>;
   }
   return <BpmnView xml={xml} />;

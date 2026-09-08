@@ -151,6 +151,15 @@ button.link {
   padding: 0 8px;
 }
 
+.colempty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 18px 8px;
+}
+
 .card {
   border: 1px solid var(--line);
   border-left: 3px solid transparent;
@@ -357,9 +366,74 @@ button.link {
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px;
+  padding: 8px 12px;
   max-height: 300px;
   overflow: auto;
+}
+
+.mdview h1 {
+  font-size: 19px;
+  margin: 10px 0 6px;
+}
+
+.mdview h2 {
+  font-size: 16px;
+  margin: 10px 0 6px;
+}
+
+.mdview h3 {
+  font-size: 14px;
+  margin: 8px 0 4px;
+}
+
+.mdview p {
+  margin: 6px 0;
+}
+
+.mdview ul,
+.mdview ol {
+  padding-left: 22px;
+  margin: 6px 0;
+}
+
+.mdview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  font-size: 13px;
+  white-space: normal;
+}
+
+.mdview th,
+.mdview td {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.mdview th {
+  background: #efece3;
+}
+
+.mdview pre {
+  background: #23211c;
+  color: #f4f2ec;
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow: auto;
+  white-space: pre;
+}
+
+.mdview code {
+  font-family: Consolas, monospace;
+  font-size: 13px;
+}
+
+.mdview blockquote {
+  border-left: 3px solid var(--line);
+  margin: 6px 0;
+  padding: 2px 10px;
+  color: var(--muted);
 }
 
 .bpmnview {

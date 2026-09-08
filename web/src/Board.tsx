@@ -93,6 +93,7 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
             <div className="colhead">
               {col.title} <span className="count">{byCol(col.id).length}</span>
             </div>
+            {byCol(col.id).length === 0 && <div className="colempty">Пусто</div>}
             {byCol(col.id).map((c) => (
               <div
                 key={c.id}
@@ -106,7 +107,7 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
                 <div className="cardmeta">
                   {c.started_at && <span className="badge">с {fmtDate(c.started_at)}</span>}
                   {c.kind === 'request' && <span className="badge req">запрос</span>}
-                  {c.waitingDays !== null && (
+                  {c.waitingDays !== null && c.waitingDays > 0 && (
                     <span className={'badge' + (c.waitingDays > 3 ? ' bad' : ' wait')}>
                       ждём {plural(c.waitingDays, 'день', 'дня', 'дней')}
                     </span>

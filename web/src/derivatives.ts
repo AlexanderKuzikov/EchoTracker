@@ -10,6 +10,15 @@ export async function docxToMarkdown(buf: ArrayBuffer): Promise<string> {
   return new TurndownService({ headingStyle: 'atx' }).turndown(html);
 }
 
+export function hasBpmnLayout(xml: string): boolean {
+  return /BPMNDiagram/i.test(xml);
+}
+
+export function svgHasContent(svg: string): boolean {
+  const body = svg.replace(/<defs>[\s\S]*?<\/defs>/gi, '');
+  return /<(path|rect|circle|text|polygon|ellipse|line|polyline)[\s>/]/i.test(body);
+}
+
 export async function bpmnToSvg(xml: string): Promise<string> {
   const { default: Viewer } = await import('bpmn-js/lib/Viewer');
   const el = document.createElement('div');

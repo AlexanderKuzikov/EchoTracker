@@ -2,6 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { AuthError, api, type Card, type Column, type User } from './api';
 import Board from './Board';
 
+const ROLE_NAMES: Record<string, string> = {
+  admin: 'Администратор',
+  member: 'Участник',
+  watcher: 'Наблюдатель',
+};
+
 export default function App() {
   const [me, setMe] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -70,7 +76,7 @@ export default function App() {
       <header className="topbar">
         <strong>EchoTracker</strong>
         <span className="muted">
-          {me.login} · {me.role}
+          {me.login} · {ROLE_NAMES[me.role] ?? me.role}
         </span>
         <button
           className="link"
