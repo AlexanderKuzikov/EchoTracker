@@ -19,6 +19,7 @@ export default function App() {
   const [cards, setCards] = useState<Card[]>([]);
   const [login, setLogin] = useState('');
   const [pass, setPass] = useState('');
+  const [show, setShow] = useState(false);
   const [err, setErr] = useState('');
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<'board' | 'cal' | 'docs'>('board');
@@ -79,8 +80,11 @@ export default function App() {
         </label>
         <label>
           Пароль
-          <input name="password" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
+          <input name="password" type={show ? 'text' : 'password'} autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
         </label>
+        <div className="row">
+          <button className="link" onClick={() => setShow(!show)}>{show ? 'Скрыть пароль' : 'Показать пароль'}</button>
+        </div>
         <button onClick={doLogin}>Войти</button>
       </div>
     );

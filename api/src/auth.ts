@@ -74,12 +74,13 @@ export function seedAdmin(
   email: string,
 ): SessionUser | null {
   const count = db.prepare('SELECT COUNT(*) AS c FROM users').get() as { c: number };
-  if (count.c > 0 || !login || !pass) return null;
+  const clean = login.trim().toLowerCase();
+  if (count.c > 0 || !clean || !pass) return null;
   const { salt, hash } = hashPassword(pass);
   const id = randomBytes(8).toString('hex');
   const now = new Date().toISOString();
   db.prepare(
     'INSERT INTO users (id, login, email, pass_salt, pass_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  ).run(id, login, email || null, salt, hash, 'admin', now);
-  return { id, login, email: email || null, role: 'admin' };
+  ).run(id, clean, email || null, salt, hash, 'admin', now);
+  return { id, login: clean, email: email || null, role: 'admin' };
 }

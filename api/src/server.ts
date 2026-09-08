@@ -391,7 +391,7 @@ const server = createServer(async (req, res) => {
         pass?: string;
       };
       const row = db.prepare('SELECT * FROM users WHERE login = ?').get(
-        (body.login ?? '').trim(),
+        (body.login ?? '').trim().toLowerCase(),
       ) as
         | { id: string; login: string; email: string | null; pass_salt: string; pass_hash: string; role: string }
         | undefined;
@@ -462,12 +462,13 @@ const server = createServer(async (req, res) => {
         fail(res, 400, 'login and pass>=8 required');
         return;
       }
+      const cleanLogin = b.login.trim().toLowerCase();
       const role = ['admin', 'member', 'watcher'].includes(b.role ?? '') ? b.role! : 'member';
       const { salt, hash } = hashPassword(b.pass);
       try {
         db.prepare(
           'INSERT INTO users (id, login, email, pass_salt, pass_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ).run(randomUUID(), b.login.trim(), b.email?.trim() || null, salt, hash, role, new Date().toISOString());
+        ).run(randomUUID(), cleanLogin, b.email?.trim() || null, salt, hash, role, new Date().toISOString());
       } catch {
         fail(res, 409, 'login taken');
         return;
