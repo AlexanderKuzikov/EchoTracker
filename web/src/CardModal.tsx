@@ -194,9 +194,12 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
         <ul className="files">
           {originals.map((f) => (
             <li key={f.id}>
-              <a href={api.fileUrl(f.id)} target="_blank" rel="noreferrer">{f.orig_name}</a>
-              <span className="muted"> {(f.size / 1024).toFixed(1)} КБ</span>
-              <button className="link" onClick={() => api.deleteFile(f.id).then(refresh)}>убрать</button>
+              <div className="filerow">
+                <span className="fileext">{extOf(f.orig_name)}</span>
+                <a href={api.fileUrl(f.id)} target="_blank" rel="noreferrer">{f.orig_name}</a>
+                <span className="muted"> {(f.size / 1024).toFixed(1)} КБ</span>
+                <button className="link" onClick={() => api.deleteFile(f.id).then(refresh)}>убрать</button>
+              </div>
               {(f.mime.startsWith('image/') || f.orig_name.toLowerCase().endsWith('.svg')) && (
                 <div><img className="preview zoomable" src={api.fileUrl(f.id)} alt={f.orig_name} onClick={() => setZoom(api.fileUrl(f.id))} /></div>
               )}
@@ -204,7 +207,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
                 <div><iframe className="previewdoc" src={api.fileUrl(f.id)} title={f.orig_name} /></div>
               )}
               {(f.mime === 'text/plain' || f.orig_name.toLowerCase().endsWith('.txt')) && (
-                <TxtPreview id={f.id} />
+                <TxtPreview id={f.id} name={f.orig_name} />
               )}
             </li>
           ))}
@@ -366,6 +369,11 @@ function CopyIcon() {
   );
 }
 
+function extOf(name: string): string {
+  const i = name.lastIndexOf('.');
+  return i < 0 ? 'файл' : name.slice(i + 1).toLowerCase();
+}
+
 function MdPreview({ id, name }: { id: string; name: string }) {
   const [html, setHtml] = useState('');
   const [raw, setRaw] = useState('');
@@ -383,7 +391,7 @@ function MdPreview({ id, name }: { id: string; name: string }) {
     <div>
       <h4>
         {name}{' '}
-        <button className="iconbtn" title={copied ? 'Скопировано' : 'Копировать'} onClick={() => copyText(raw).then((ok) => flash(ok, setCopied))}>
+        <button className="iconbtn" title={copied ? 'Скопировано' : 'Копировать текст в буфер'} onClick={() => copyText(raw).then((ok) => flash(ok, setCopied))}>
           <CopyIcon />
         </button>
       </h4>
@@ -419,7 +427,7 @@ async function copyText(t: string): Promise<boolean> {
   }
 }
 
-function TxtPreview({ id }: { id: string }) {
+function TxtPreview({ id, name }: { id: string; name: string }) {
   const [text, setText] = useState('');
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -430,11 +438,12 @@ function TxtPreview({ id }: { id: string }) {
   }, [id]);
   return (
     <div>
-      <div>
-        <button className="iconbtn" title={copied ? 'Скопировано' : 'Копировать'} onClick={() => copyText(text).then((ok) => flash(ok, setCopied))}>
+      <h4>
+        {name}{' '}
+        <button className="iconbtn" title={copied ? 'Скопировано' : 'Копировать текст в буфер'} onClick={() => copyText(text).then((ok) => flash(ok, setCopied))}>
           <CopyIcon />
         </button>
-      </div>
+      </h4>
       <pre className="mdview">{text}</pre>
     </div>
   );

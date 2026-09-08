@@ -642,7 +642,41 @@ button.link {
 }
 
 .files li {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
   margin-bottom: 10px;
+}
+
+.filerow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filerow a {
+  font-weight: 600;
+}
+
+.fileext {
+  font-size: 11px;
+  color: var(--tech);
+  border: 1px solid var(--tech);
+  background: #eef4fd;
+  border-radius: 6px;
+  padding: 1px 7px;
+  flex: none;
+}
+
+input[type='file'] {
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  width: 100%;
+  cursor: pointer;
 }
 
 .preview {
