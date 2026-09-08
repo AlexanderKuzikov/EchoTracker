@@ -17,6 +17,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
   const [err, setErr] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState('');
+  const [zoom, setZoom] = useState<string | null>(null);
   const [showBpmn, setShowBpmn] = useState(false);
   const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '', started_at: '' });
 
@@ -117,7 +118,8 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
     );
   }
   const originals = (card.files ?? []).filter((x) => x.kind === 'original');
-  const md = (card.files ?? []).find((x) => x.kind === 'md');
+  const md = (card.files ?? []).find((x) => x.kind === 'md')
+    ?? (card.files ?? []).find((x) => x.kind === 'original' && (x.orig_name.toLowerCase().endsWith('.md') || x.mime === 'text/markdown'));
   const svg = (card.files ?? []).find((x) => x.kind === 'svg');
   const bpmnSrc = (card.files ?? []).find((x) => x.orig_name.toLowerCase().endsWith('.bpmn'));
 
@@ -190,7 +192,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
               <span className="muted"> {(f.size / 1024).toFixed(1)} КБ</span>
               <button className="link" onClick={() => api.deleteFile(f.id).then(refresh)}>убрать</button>
               {(f.mime.startsWith('image/') || f.orig_name.toLowerCase().endsWith('.svg')) && (
-                <div><img className="preview" src={api.fileUrl(f.id)} alt={f.orig_name} /></div>
+                <div><img className="preview zoomable" src={api.fileUrl(f.id)} alt={f.orig_name} onClick={() => setZoom(api.fileUrl(f.id))} /></div>
               )}
               {f.mime === 'application/pdf' && (
                 <div><iframe className="previewdoc" src={api.fileUrl(f.id)} title={f.orig_name} /></div>
@@ -205,7 +207,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
         {svg && (
           <div>
             <h4>Схема</h4>
-            <img className="previewwide" src={api.fileUrl(svg.id)} alt={svg.orig_name} />
+            <img className="previewwide zoomable" src={api.fileUrl(svg.id)} alt={svg.orig_name} onClick={() => setZoom(api.fileUrl(svg.id))} />
             {bpmnSrc && !showBpmn && <div><button onClick={() => setShowBpmn(true)}>Открыть интерактивно</button></div>}
           </div>
         )}
@@ -216,6 +218,11 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           <Suspense fallback={<div>Гружу вьювер…</div>}>
             <BpmnTextView id={bpmnSrc.id} />
           </Suspense>
+        )}
+        {zoom && (
+          <div className="lightbox" onClick={() => setZoom(null)}>
+            <img src={zoom} alt="увеличено" onClick={(e) => e.stopPropagation()} />
+          </div>
         )}
       </div>
     </div>

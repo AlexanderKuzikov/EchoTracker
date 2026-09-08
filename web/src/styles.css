@@ -157,8 +157,9 @@ button.link {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 88px;
+  height: 108px;
   padding: 6px;
+  overflow: hidden;
 }
 
 .calday.other {
@@ -459,6 +460,29 @@ button.link {
   background: #fff;
 }
 
+.zoomable {
+  cursor: zoom-in;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  z-index: 30;
+  cursor: zoom-out;
+  overflow: auto;
+}
+
+.lightbox img {
+  max-width: none;
+  background: #fff;
+  border-radius: 8px;
+}
+
 .mdview {
   white-space: pre-wrap;
   background: var(--bg);
@@ -470,16 +494,22 @@ button.link {
 }
 
 .mdview h1 {
-  font-size: 19px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 17px;
   margin: 10px 0 6px;
 }
 
 .mdview h2 {
-  font-size: 16px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
   margin: 10px 0 6px;
 }
 
 .mdview h3 {
+  font-family: inherit;
+  font-weight: 700;
   font-size: 14px;
   margin: 8px 0 4px;
 }

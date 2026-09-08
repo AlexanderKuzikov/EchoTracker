@@ -3,6 +3,11 @@ interface SvgCapable {
   destroy(): void;
 }
 
+interface HeadlessViewer extends SvgCapable {
+  importXML(x: string): Promise<unknown>;
+  get(name: string): { zoom(mode: string): void };
+}
+
 export async function docxToMarkdown(buf: ArrayBuffer): Promise<string> {
   const mammoth = (await import('mammoth')).default;
   const { default: TurndownService } = await import('turndown');
@@ -22,15 +27,16 @@ export function svgHasContent(svg: string): boolean {
 export async function bpmnToSvg(xml: string): Promise<string> {
   const { default: Viewer } = await import('bpmn-js/lib/Viewer');
   const el = document.createElement('div');
-  const viewer = new Viewer({ container: el }) as unknown as SvgCapable & {
-    importXML(x: string): Promise<unknown>;
-  };
+  el.style.cssText = 'position:fixed;left:-10000px;top:0;width:1200px;height:800px;';
+  document.body.appendChild(el);
+  const viewer = new Viewer({ container: el }) as unknown as HeadlessViewer;
   try {
     await viewer.importXML(xml);
     const { svg } = await viewer.saveSVG();
     return svg;
   } finally {
     viewer.destroy();
+    el.remove();
   }
 }
 
