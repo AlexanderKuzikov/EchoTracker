@@ -180,36 +180,36 @@ export function sweepReminders(
   const tomorrow = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10);
   const due = db
     .prepare(
-      `SELECT c.id, c.title, c.deadline, u.email FROM cards c
+      `SELECT c.id, c.code, c.title, c.deadline, u.email FROM cards c
        JOIN users u ON u.id = c.assignee_id
        WHERE c.deadline IS NOT NULL AND c.deadline <= ? AND c.column_id != 'done'
        AND u.email IS NOT NULL`,
     )
-    .all(tomorrow) as Array<{ id: string; title: string; deadline: string; email: string }>;
+    .all(tomorrow) as Array<{ id: string; code: string; title: string; deadline: string; email: string }>;
   for (const d of due) {
     enqueue(
       db,
       d.email,
-      `Срок: ${d.title}`,
-      `Карточка «${d.title}» — срок ${d.deadline}.\n${baseUrl}/#${d.id}`,
+      `Срок ${d.code}: ${d.title}`,
+      `Карточка ${d.code} «${d.title}» — срок ${d.deadline}.\n${baseUrl}/#${d.id}`,
     );
     enqueued++;
   }
   const staleMs = warnDays * 24 * 3600 * 1000;
   const stale = db
     .prepare(
-      `SELECT c.id, c.title, c.updated_at, u.email FROM cards c
+      `SELECT c.id, c.code, c.title, c.updated_at, u.email FROM cards c
        JOIN users u ON u.id = c.created_by
        WHERE c.column_id = 'waiting' AND u.email IS NOT NULL`,
     )
-    .all() as Array<{ id: string; title: string; updated_at: string; email: string }>;
+    .all() as Array<{ id: string; code: string; title: string; updated_at: string; email: string }>;
   for (const s of stale) {
     if (Date.now() - Date.parse(s.updated_at) < staleMs) continue;
     enqueue(
       db,
       s.email,
-      `Висит ожидание: ${s.title}`,
-      `Карточка «${s.title}» ждёт заказчика дольше ${warnDays} дн.\n${baseUrl}/#${s.id}`,
+      `Висит ожидание ${s.code}: ${s.title}`,
+      `Карточка ${s.code} «${s.title}» ждёт заказчика дольше ${warnDays} дн.\n${baseUrl}/#${s.id}`,
     );
     enqueued++;
   }

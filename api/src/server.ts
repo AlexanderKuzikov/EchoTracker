@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync, unlinkSync, existsSync } from '
 import { join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { openDb } from './db.ts';
+import { openDb, nextCode } from './db.ts';
 import {
   getUser,
   roleRank,
@@ -189,6 +189,7 @@ function parseMultipart(body: Buffer, boundary: string): Part[] {
 
 interface CardRow {
   id: string;
+  code: string;
   title: string;
   body: string;
   column_id: string;
@@ -222,13 +223,18 @@ function visibleTo(user: SessionUser): { sql: string; params: string[] } {
   return { sql: '(c.created_by = ? OR c.assignee_id = ?)', params: [user.id, user.id] };
 }
 
-function getCard(id: string): CardRow | undefined {
-  return db
-    .prepare(
-      `SELECT c.*, u.login AS assignee_login, u.email AS assignee_email FROM cards c
-       LEFT JOIN users u ON u.id = c.assignee_id WHERE c.id = ?`,
-    )
-    .get(id) as CardRow | undefined;
+const CARD_SELECT = `SELECT c.*, u.login AS assignee_login, u.email AS assignee_email FROM cards c
+       LEFT JOIN users u ON u.id = c.assignee_id`;
+
+function getCard(ref: string): CardRow | undefined {
+  const byId = db.prepare(`${CARD_SELECT} WHERE c.id = ?`).get(ref) as CardRow | undefined;
+  if (byId) return byId;
+  if (/^T-\d+$/i.test(ref)) {
+    return db.prepare(`${CARD_SELECT} WHERE c.code = ?`).get(ref.toUpperCase()) as
+      | CardRow
+      | undefined;
+  }
+  return undefined;
 }
 
 function canSeeCard(user: SessionUser, card: CardRow): boolean {
@@ -472,11 +478,13 @@ const server = createServer(async (req, res) => {
       }
       const now = new Date().toISOString();
       const id = randomUUID();
+      const code = nextCode(db);
       db.prepare(
-        `INSERT INTO cards (id, title, body, column_id, kind, assignee_id, deadline, requested_at, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO cards (id, code, title, body, column_id, kind, assignee_id, deadline, requested_at, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
+        code,
         b.title.trim(),
         b.body ?? '',
         col,
@@ -493,7 +501,7 @@ const server = createServer(async (req, res) => {
           email: string | null;
         };
         if (u?.email) {
-          enqueue(db, u.email, `Новая карточка: ${b.title.trim()}`, `Тебе назначили «${b.title.trim()}».\n${baseUrl()}/#${id}`);
+          enqueue(db, u.email, `Новая карточка ${code}: ${b.title.trim()}`, `Тебе назначили ${code} «${b.title.trim()}».\n${baseUrl()}/#${id}`);
         }
       }
       const created = getCard(id);
@@ -572,7 +580,7 @@ const server = createServer(async (req, res) => {
               email: string | null;
             };
             if (u?.email) {
-              enqueue(db, u.email, `Назначена карточка: ${card.title}`, `Тебе назначили «${card.title}».\n${baseUrl()}/#${card.id}`);
+              enqueue(db, u.email, `Назначена карточка ${card.code}: ${card.title}`, `Тебе назначили ${card.code} «${card.title}».\n${baseUrl()}/#${card.id}`);
             }
           }
         }

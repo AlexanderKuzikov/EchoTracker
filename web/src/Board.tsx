@@ -84,6 +84,7 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
               >
                 <div className="cardtitle">{c.title}</div>
                 <div className="cardmeta">
+                  <span className="badge">{c.code}</span>
                   {c.kind === 'request' && <span className="badge req">запрос</span>}
                   {c.assignee_login && <span className="badge">{c.assignee_login}</span>}
                   {c.deadline && <span className={'badge' + (c.overdue ? ' bad' : '')}>до {c.deadline}</span>}

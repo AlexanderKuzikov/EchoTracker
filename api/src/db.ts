@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS columns (
 );
 CREATE TABLE IF NOT EXISTS cards (
   id TEXT PRIMARY KEY,
+  code TEXT UNIQUE,
   title TEXT NOT NULL,
   body TEXT NOT NULL DEFAULT '',
   column_id TEXT NOT NULL REFERENCES columns(id),
@@ -82,5 +83,34 @@ export function openDb(file: string): DatabaseSync {
     const ins = db.prepare('INSERT INTO columns (id, title, pos) VALUES (?, ?, ?)');
     for (const [id, title, pos] of SEED_COLUMNS) ins.run(id, title, pos);
   }
+  ensureCodes(db);
   return db;
+}
+
+export function fmtCode(n: number): string {
+  return 'T-' + String(n).padStart(4, '0');
+}
+
+export function nextCode(db: DatabaseSync): string {
+  const row = db.prepare(`SELECT value FROM settings WHERE key = 'card_seq'`).get() as
+    | { value: string }
+    | undefined;
+  const n = (row ? parseInt(row.value, 10) || 0 : 0) + 1;
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES ('card_seq', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run(String(n));
+  return fmtCode(n);
+}
+
+function ensureCodes(db: DatabaseSync): void {
+  const cols = db.prepare(`PRAGMA table_info(cards)`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === 'code')) {
+    db.exec('ALTER TABLE cards ADD COLUMN code TEXT');
+  }
+  const bare = db
+    .prepare(`SELECT id FROM cards WHERE code IS NULL ORDER BY created_at, rowid`)
+    .all() as Array<{ id: string }>;
+  for (const r of bare) {
+    db.prepare(`UPDATE cards SET code = ? WHERE id = ?`).run(nextCode(db), r.id);
+  }
 }

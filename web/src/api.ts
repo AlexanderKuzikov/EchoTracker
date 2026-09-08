@@ -24,6 +24,7 @@ export interface FileRow {
 
 export interface Card {
   id: string;
+  code: string;
   title: string;
   body: string;
   column_id: string;

@@ -113,6 +113,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
     <div className="backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         {err && <div className="error">{err}</div>}
+        <div className="muted">{card.code}</div>
         <input className="modaltitle" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         <div className="grid2">
           <label>
