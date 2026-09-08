@@ -191,6 +191,20 @@ button.link {
   padding: 2px 4px;
 }
 
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.iconbtn:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
 .error {
   background: #fdecea;
   border: 1px solid var(--bad);

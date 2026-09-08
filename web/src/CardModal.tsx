@@ -357,6 +357,15 @@ function Feed({ card, refresh }: { card: Card; refresh: () => Promise<void> }) {
   );
 }
 
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="5" y="5" width="9" height="9" rx="2" />
+      <path d="M11 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1" />
+    </svg>
+  );
+}
+
 function MdPreview({ id, name }: { id: string; name: string }) {
   const [html, setHtml] = useState('');
   const [raw, setRaw] = useState('');
@@ -373,8 +382,10 @@ function MdPreview({ id, name }: { id: string; name: string }) {
   return (
     <div>
       <h4>
-        {name} <button className="link" onClick={() => copyText(raw).then((ok) => flash(ok, setCopied))}>Копировать</button>
-        {copied && <span className="muted"> — скопировано</span>}
+        {name}{' '}
+        <button className="iconbtn" title={copied ? 'Скопировано' : 'Копировать'} onClick={() => copyText(raw).then((ok) => flash(ok, setCopied))}>
+          <CopyIcon />
+        </button>
       </h4>
       <div className="mdview" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
@@ -420,8 +431,9 @@ function TxtPreview({ id }: { id: string }) {
   return (
     <div>
       <div>
-        <button className="link" onClick={() => copyText(text).then((ok) => flash(ok, setCopied))}>Копировать</button>
-        {copied && <span className="muted"> — скопировано</span>}
+        <button className="iconbtn" title={copied ? 'Скопировано' : 'Копировать'} onClick={() => copyText(text).then((ok) => flash(ok, setCopied))}>
+          <CopyIcon />
+        </button>
       </div>
       <pre className="mdview">{text}</pre>
     </div>
