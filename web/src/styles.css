@@ -502,6 +502,13 @@ button.link {
   margin: 10px 0 6px;
 }
 
+.mdview h1 strong,
+.mdview h2 strong,
+.mdview h3 strong,
+.mdview th strong {
+  font-weight: inherit;
+}
+
 .mdview h2 {
   font-family: inherit;
   font-weight: 600;
@@ -543,6 +550,7 @@ button.link {
 
 .mdview th {
   background: #efece3;
+  font-weight: 600;
 }
 
 .mdview pre {

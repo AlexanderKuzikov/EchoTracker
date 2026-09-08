@@ -3,6 +3,7 @@ import { AuthError, api, type Card, type Column, type User } from './api';
 import Board, { initials } from './Board';
 import Calendar from './Calendar';
 import CardModalHost from './CardModal';
+import NoFill from './NoFill';
 
 const ROLE_NAMES: Record<string, string> = {
   admin: 'Администратор',
@@ -155,9 +156,9 @@ function AdminPanel({ users, reload }: { users: User[]; reload: () => void }) {
         ))}
       </ul>
       <div className="row">
-        <input value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Логин" />
-        <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Пароль 8+" />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
+        <NoFill name="echotracker-new-login" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Логин" />
+        <NoFill name="echotracker-new-pass" type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Пароль 8+" />
+        <NoFill name="echotracker-new-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
         <select value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="member">member</option>
           <option value="watcher">watcher</option>

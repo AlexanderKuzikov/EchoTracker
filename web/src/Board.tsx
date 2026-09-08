@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, type Card, type Column, type User } from './api';
+import NoFill from './NoFill';
 
 export function initials(login: string): string {
   const clean = login.replace(/[^a-zA-Zа-яА-ЯёЁ0-9]/g, '').slice(0, 2).toUpperCase();
@@ -65,9 +66,8 @@ export default function Board({ user, columns, cards, reload, setOpenId }: Props
     <div>
       {canEdit && (
         <div className="composer">
-          <input
+          <NoFill
             name="echotracker-new-card"
-            autoComplete="off"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && create()}

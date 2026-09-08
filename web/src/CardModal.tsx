@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { api, type Card, type CheckItem, type Column, type User } from './api';
+import NoFill from './NoFill';
 import { baseName, bpmnToSvg, docxToMarkdown, hasBpmnLayout, svgHasContent, svgToPng } from './derivatives';
 import { renderMarkdown } from './md';
 
@@ -128,7 +129,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
     <div className="backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         {err && <div className="error">{err}</div>}
-        <input className="modaltitle" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+        <NoFill className="modaltitle" name="echotracker-card-title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         <div className="grid2">
           <label>
             Тип
@@ -274,7 +275,8 @@ function Checklist({ card, refresh }: { card: Card; refresh: () => Promise<void>
         ))}
       </ul>
       <div className="row">
-        <input
+        <NoFill
+          name="echotracker-check"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
@@ -336,7 +338,8 @@ function Feed({ card, refresh }: { card: Card; refresh: () => Promise<void> }) {
       {err && <div className="error">{err}</div>}
       <div className="feed">{events.map((e) => e.node)}</div>
       <div className="row">
-        <input
+        <NoFill
+          name="echotracker-comment"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
