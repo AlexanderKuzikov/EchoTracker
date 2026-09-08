@@ -734,8 +734,27 @@ async function tick(): Promise<void> {
   }
 }
 
-server.listen(env.port, '127.0.0.1', () => {
-  console.log(`echotracker ${VERSION} on 127.0.0.1:${env.port}`);
-  setTimeout(tick, 3000).unref?.();
-  setInterval(tick, env.workerMs).unref?.();
-});
+let serving = false;
+function tryListen(port: number, left: number): void {
+  const onErr = (e: unknown) => {
+    if ((e as { code?: string }).code === 'EADDRINUSE' && left > 0) {
+      log(`port ${port} busy, trying ${port + 1}`);
+      tryListen(port + 1, left - 1);
+    } else {
+      throw e;
+    }
+  };
+  server.once('error', onErr);
+  server.listen(port, '127.0.0.1', () => {
+    server.off('error', onErr);
+    if (serving) return;
+    serving = true;
+    const addr = server.address();
+    const real = typeof addr === 'object' && addr !== null ? addr.port : port;
+    console.log(`echotracker ${VERSION} on 127.0.0.1:${real}`);
+    setTimeout(tick, 3000).unref?.();
+    setInterval(tick, env.workerMs).unref?.();
+  });
+}
+
+tryListen(env.port, 20);

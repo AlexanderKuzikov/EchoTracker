@@ -2,8 +2,8 @@
 
 ## Commands
 
+- dev: `pnpm dev` (одна команда: api + web, порты с автоподбором от 8100/5174, Ctrl+C гасит всё)
 - install: `pnpm install` (только по явной просьбе пользователя)
-- dev: `pnpm dev` (api + web в watch)
 - test: `pnpm test`
 - build: `pnpm build`
 - typecheck: `pnpm typecheck`
