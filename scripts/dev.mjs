@@ -72,9 +72,10 @@ const apiPort = await pick(Number(process.env['PORT'] ?? 8100));
 let webPort = Number(process.env['WEB_PORT'] ?? 5174);
 if (webPort === apiPort) webPort = apiPort + 1;
 webPort = await pick(webPort);
+const base = process.env['ECHO_BASE'] ?? '/echo/';
 run('api', 'node', ['--watch', 'src/server.ts'], join(root, 'api'), { PORT: String(apiPort) });
 run('web', 'pnpm', ['--filter', '@echotracker/web', 'dev'], root, {
   WEB_PORT: String(webPort),
   API_PORT: String(apiPort),
 });
-console.log(`dev: api :${apiPort}, web :${webPort} — Ctrl+C гасит всё`);
+console.log(`dev: api :${apiPort}, web :${webPort}${base} — Ctrl+C гасит всё`);

@@ -39,8 +39,8 @@ export function parseCookies(header: string | undefined): Record<string, string>
   return out;
 }
 
-export function sessionCookie(sid: string, secure: boolean): string {
-  let c = `et_sid=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`;
+export function sessionCookie(sid: string, secure: boolean, path: string): string {
+  let c = `et_sid=${sid}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=2592000`;
   if (secure) c += '; Secure';
   return c;
 }

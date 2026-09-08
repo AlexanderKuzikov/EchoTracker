@@ -11,16 +11,17 @@ interface Props {
   users: User[];
   columns: Column[];
   onClose: () => void;
+  onOpenDoc: (path: string) => void;
 }
 
-export default function CardModalHost({ cardId, users, columns, onClose }: Props) {
+export default function CardModalHost({ cardId, users, columns, onClose, onOpenDoc }: Props) {
   const [card, setCard] = useState<Card | null>(null);
   const [err, setErr] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState('');
   const [zoom, setZoom] = useState<string | null>(null);
   const [showBpmn, setShowBpmn] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '', started_at: '' });
+  const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '', started_at: '', doc_ref: '' });
 
   useEffect(() => {
     api
@@ -36,6 +37,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           deadline: c.deadline ?? '',
           requested_at: c.requested_at ?? '',
           started_at: c.started_at ?? '',
+          doc_ref: c.doc_ref ?? '',
         });
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -59,6 +61,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           deadline: draft.deadline || null,
           requested_at: draft.requested_at || null,
           started_at: draft.started_at || null,
+          doc_ref: draft.doc_ref.trim() || null,
         });
       await refresh();
     } catch (e) {
@@ -171,6 +174,15 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           </label>
         </div>
         <textarea rows={5} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} placeholder="Описание…" />
+        <div className="row">
+          <NoFill
+            name="echotracker-docref"
+            value={draft.doc_ref}
+            onChange={(e) => setDraft({ ...draft, doc_ref: e.target.value })}
+            placeholder="Документ: docs/CONTEXT.md…"
+          />
+          <button onClick={() => draft.doc_ref.trim() !== '' && onOpenDoc(draft.doc_ref.trim())}>Открыть</button>
+        </div>
         <div className="row">
           <button className="primary" onClick={save}>Сохранить</button>
           <button className="danger" onClick={remove}>Удалить</button>

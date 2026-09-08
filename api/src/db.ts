@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS cards (
   deadline TEXT,
   requested_at TEXT,
   started_at TEXT,
+  doc_ref TEXT,
   created_by TEXT REFERENCES users(id),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -166,6 +167,7 @@ function ensureDerived(db: DatabaseSync): void {
 function ensureCodes(db: DatabaseSync): void {
   ensureColumn(db, 'cards', 'code', 'TEXT');
   ensureColumn(db, 'cards', 'started_at', 'TEXT');
+  ensureColumn(db, 'cards', 'doc_ref', 'TEXT');
   const bare = db
     .prepare(`SELECT id FROM cards WHERE code IS NULL ORDER BY created_at, rowid`)
     .all() as Array<{ id: string }>;

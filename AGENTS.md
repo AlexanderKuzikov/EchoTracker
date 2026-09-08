@@ -2,7 +2,7 @@
 
 ## Commands
 
-- dev: `pnpm dev` (одна команда: api + web, порты с автоподбором от 8100/5174, Ctrl+C гасит всё)
+- dev: `pnpm dev` (одна команда: api + web под /echo, порты с автоподбором, Ctrl+C гасит всё)
 - install: `pnpm install` (только по явной просьбе пользователя)
 - test: `pnpm test`
 - build: `pnpm build`
@@ -11,9 +11,11 @@
 ## Conventions
 
 - Стек: React 19 thin (без гридов и форм-библиотек) + Node + SQLite, Caddy с LE
-- Одна копия — один проект, project_id в базе нет
+- Живёт в репо проекта в `echo/`, отдаётся с сабпата `ECHO_BASE` (дефолт /echo/); project_id в базе нет
+- Доки проекта читаются живьём из `../docs` + `../README.md`, трекер их никогда не пишет
 - Оригинал docx неприкосновенен, md — производная и пересоздаётся
 - Файлы на диске под uuid, в базе только мета; отдача только через API с проверкой прав
+- Производные привязаны к родителю (derived_from), удаление каскадом с чисткой диска
 - Уведомления через порт Notifier, первый адаптер Email
 - Коммиты повелительным наклонением, заголовок до 72 символов, без точки в конце
 - Коммиты прямо в `main`, без веток и PR; коммитить и пушить только по явной просьбе
@@ -22,15 +24,16 @@
 ## Structure
 
 ```
-EchoTracker/
+EchoTracker/              # апстрим; в проект ложится как echo/ через scripts/adopt.ps1
 ├── README.md
 ├── AGENTS.md
 ├── docs/
 │   ├── CONTEXT.md
 │   └── DECISIONS.md
 ├── api/src/         # zero-dep TS: server, db, auth, email (запуск без сборки)
-├── web/src/         # тонкий React: доска, модалка, md/bpmn-производные
-├── scripts/dev.ps1  # dev api+web
+├── web/src/         # тонкий React: доска, календарь, документы, модалка, производные
+├── scripts/dev.mjs  # dev api+web
+├── scripts/adopt.ps1  # встройка копии в проект
 ├── .env.example   # шаблон конфига, секретов нет
 └── data/ uploads/   # вне git
 ```

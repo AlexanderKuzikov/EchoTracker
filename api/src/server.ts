@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { mkdirSync, readFileSync, writeFileSync, unlinkSync, existsSync } from 'node:fs';
-import { join, normalize, extname } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join, normalize, extname, resolve, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { openDb, nextCode } from './db.ts';
@@ -40,12 +40,21 @@ function loadEnvFile(): void {
 
 loadEnvFile();
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
+
+function normBase(v: string | undefined): string {
+  let b = (v ?? '/echo/').trim() || '/echo/';
+  if (!b.startsWith('/')) b = '/' + b;
+  if (!b.endsWith('/')) b += '/';
+  return b;
+}
 
 const env = {
   port: Number(process.env['PORT'] ?? 8100),
+  base: normBase(process.env['ECHO_BASE']),
   dataDir: process.env['DATA_DIR'] ?? './data',
   uploadsDir: process.env['UPLOADS_DIR'] ?? './uploads',
+  docsDir: process.env['DOCS_DIR'] ?? '../docs',
   adminLogin: process.env['ADMIN_LOGIN'] ?? '',
   adminPass: process.env['ADMIN_PASS'] ?? '',
   adminEmail: process.env['ADMIN_EMAIL'] ?? '',
@@ -195,6 +204,7 @@ interface CardRow {
   checklist_open: number;
   checklist_total: number;
   started_at: string | null;
+  doc_ref: string | null;
   title: string;
   body: string;
   column_id: string;
@@ -349,9 +359,22 @@ function serveStatic(pathname: string, res: ServerResponse): void {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    const path = url.pathname;
+    const raw = url.pathname;
     const method = req.method ?? 'GET';
     const ip = req.socket.remoteAddress ?? '?';
+    const bare = env.base.slice(0, -1);
+    let path = raw;
+    if (env.base !== '/' && raw === bare) {
+      res.writeHead(302, { Location: env.base });
+      res.end();
+      return;
+    }
+    if (env.base !== '/' && raw.startsWith(env.base)) {
+      path = raw.slice(env.base.length - 1);
+    } else if (env.base !== '/') {
+      fail(res, 404, 'not found');
+      return;
+    }
 
     if (path === '/api/health' && method === 'GET') {
       json(res, 200, { ok: true, version: VERSION });
@@ -379,7 +402,7 @@ const server = createServer(async (req, res) => {
       const sid = createSession(db, row.id);
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
-        'Set-Cookie': sessionCookie(sid, env.cookieSecure),
+        'Set-Cookie': sessionCookie(sid, env.cookieSecure, env.base),
       });
       res.end(JSON.stringify({ id: row.id, login: row.login, email: row.email, role: row.role }));
       return;
@@ -500,6 +523,7 @@ const server = createServer(async (req, res) => {
         deadline?: string | null;
         requested_at?: string | null;
         started_at?: string | null;
+        doc_ref?: string | null;
       };
       if (!b.title?.trim()) {
         fail(res, 400, 'title required');
@@ -526,8 +550,8 @@ const server = createServer(async (req, res) => {
       const id = randomUUID();
       const code = nextCode(db);
       db.prepare(
-        `INSERT INTO cards (id, code, title, body, column_id, kind, assignee_id, deadline, requested_at, started_at, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO cards (id, code, title, body, column_id, kind, assignee_id, deadline, requested_at, started_at, doc_ref, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
         code,
@@ -539,6 +563,7 @@ const server = createServer(async (req, res) => {
         b.deadline || null,
         b.requested_at || null,
         b.started_at || today,
+        b.doc_ref?.trim() || null,
         me.id,
         now,
         now,
@@ -584,6 +609,7 @@ const server = createServer(async (req, res) => {
           deadline: string | null;
           requested_at: string | null;
           started_at: string | null;
+          doc_ref: string | null;
         }>;
         if (roleRank(me.role) < 1 && (b.title !== undefined || b.column_id !== undefined)) {
           fail(res, 403, 'read only');
@@ -659,6 +685,10 @@ const server = createServer(async (req, res) => {
         if (b.started_at !== undefined) {
           sets.push('started_at = ?');
           params.push(b.started_at || null);
+        }
+        if (b.doc_ref !== undefined) {
+          sets.push('doc_ref = ?');
+          params.push(b.doc_ref?.trim() || null);
         }
         if (sets.length > 0) {
           sets.push('updated_at = ?');
@@ -929,6 +959,67 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (path === '/api/docs' && method === 'GET') {
+      const one = url.searchParams.get('path');
+      if (one) {
+        const full = resolveDoc(one);
+        if (!full) {
+          fail(res, 404, 'not found');
+          return;
+        }
+        try {
+          json(res, 200, { path: one, content: readFileSync(full, 'utf8') });
+        } catch {
+          fail(res, 404, 'not found');
+        }
+        return;
+      }
+      json(res, 200, listDocs());
+      return;
+    }
+
+    if (path === '/api/search' && method === 'GET') {
+      const q = (url.searchParams.get('q') ?? '').trim();
+      if (q.length < 2) {
+        json(res, 200, { cards: [], docs: [] });
+        return;
+      }
+      const like = `%${q.replace(/[%_\\]/g, '\\$&')}%`;
+      const v = visibleTo(me);
+      const cards = db
+        .prepare(
+          `SELECT c.id, c.title FROM cards c WHERE ${v.sql}
+           AND (c.title LIKE ? ESCAPE '\\' OR c.body LIKE ? ESCAPE '\\')
+           ORDER BY c.updated_at DESC LIMIT 20`,
+        )
+        .all(...v.params, like, like) as Array<{ id: string; title: string }>;
+      const docs: Array<{ path: string; title: string; snippet: string }> = [];
+      for (const d of listDocs()) {
+        if (docs.length >= 20) break;
+        const full = resolveDoc(d.path);
+        if (!full) continue;
+        let content = '';
+        try {
+          content = readFileSync(full, 'utf8');
+        } catch {
+          continue;
+        }
+        const atName = d.path.toLowerCase().includes(q.toLowerCase());
+        const at = content.toLowerCase().indexOf(q.toLowerCase());
+        if (!atName && at < 0) continue;
+        const snippet =
+          at < 0
+            ? ''
+            : content
+                .slice(Math.max(0, at - 60), at + 120)
+                .replace(/\s+/g, ' ')
+                .trim();
+        docs.push({ path: d.path, title: d.title, snippet });
+      }
+      json(res, 200, { cards, docs });
+      return;
+    }
+
     if (path === '/api/outbox' && method === 'GET') {
       if (me.role !== 'admin') {
         fail(res, 403, 'admin only');
@@ -955,7 +1046,76 @@ const server = createServer(async (req, res) => {
 });
 
 function baseUrl(): string {
-  return env.baseUrl || `http://127.0.0.1:${env.port}`;
+  return (env.baseUrl || `http://127.0.0.1:${env.port}`).replace(/\/+$/, '');
+}
+
+const docsRoot = resolve(env.docsDir);
+const projRoot = dirname(docsRoot);
+
+interface DocEntry {
+  path: string;
+  title: string;
+}
+
+function docTitle(file: string, content: string): string {
+  const m = content.match(/^#\s+(.+)$/m);
+  if (m?.[1]) return m[1].trim().slice(0, 80);
+  return file;
+}
+
+function listDocs(): DocEntry[] {
+  const out: DocEntry[] = [];
+  const readme = join(projRoot, 'README.md');
+  if (existsSync(readme)) {
+    try {
+      out.push({ path: 'README.md', title: docTitle('README.md', readFileSync(readme, 'utf8')) });
+    } catch {
+      /* пропускаем */
+    }
+  }
+  const walk = (dir: string, rel: string, depth: number) => {
+    if (depth > 3 || out.length > 100) return;
+    let names: string[] = [];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const n of names.sort()) {
+      if (n.startsWith('.')) continue;
+      const full = join(dir, n);
+      let st;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) walk(full, rel + n + '/', depth + 1);
+      else if (n.toLowerCase().endsWith('.md') && st.size < 512 * 1024) {
+        out.push({ path: 'docs/' + rel + n, title: n });
+      }
+    }
+  };
+  walk(docsRoot, '', 0);
+  for (const d of out) {
+    if (d.path === 'README.md') continue;
+    try {
+      d.title = docTitle(d.path, readFileSync(resolveDoc(d.path) as string, 'utf8'));
+    } catch {
+      /* оставляем имя файла */
+    }
+  }
+  return out;
+}
+
+function resolveDoc(rel: string): string | null {
+  if (rel.includes('\\') || rel.split('/').includes('..')) return null;
+  const full = rel === 'README.md' ? join(projRoot, 'README.md') : join(docsRoot, rel.replace(/^docs\//, ''));
+  if (!full.toLowerCase().endsWith('.md')) return null;
+  const norm = normalize(full);
+  if (norm !== normalize(join(projRoot, 'README.md')) && !norm.startsWith(docsRoot + sep)) return null;
+  if (!existsSync(norm)) return null;
+  return norm;
 }
 
 async function tick(): Promise<void> {

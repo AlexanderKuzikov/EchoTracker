@@ -375,6 +375,60 @@ button.link {
   background: #fdf6e3;
 }
 
+.docscols {
+  display: grid;
+  gap: 0 16px;
+}
+
+@media (min-width: 900px) {
+  .docscols {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+}
+
+.docslist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.doctab {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.doctab:hover {
+  border-color: var(--muted);
+}
+
+.doctab.on {
+  border-color: var(--tech);
+  box-shadow: 0 0 0 1px var(--tech);
+}
+
+.docview .mdview {
+  max-height: none;
+}
+
+.mdview.tall {
+  max-height: calc(100vh - 220px);
+}
+
+.searchres {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.searchres .ev {
+  cursor: pointer;
+}
+
 .composer {
   display: grid;
   grid-template-columns: 1fr 140px auto;

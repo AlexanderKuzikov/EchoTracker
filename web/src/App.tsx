@@ -3,6 +3,7 @@ import { AuthError, api, type Card, type Column, type User } from './api';
 import Board, { initials } from './Board';
 import Calendar from './Calendar';
 import CardModalHost from './CardModal';
+import Docs from './Docs';
 import NoFill from './NoFill';
 
 const ROLE_NAMES: Record<string, string> = {
@@ -20,8 +21,9 @@ export default function App() {
   const [pass, setPass] = useState('');
   const [err, setErr] = useState('');
   const [ready, setReady] = useState(false);
-  const [view, setView] = useState<'board' | 'cal'>('board');
+  const [view, setView] = useState<'board' | 'cal' | 'docs'>('board');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [docPath, setDocPath] = useState<string | null>(null);
   const [ver, setVer] = useState('');
 
   const load = useCallback(async () => {
@@ -42,7 +44,7 @@ export default function App() {
         if (!(e instanceof AuthError)) setErr(e instanceof Error ? e.message : String(e));
       })
       .finally(() => setReady(true));
-    fetch('/api/health', { credentials: 'same-origin' })
+    fetch(`${import.meta.env.BASE_URL}api/health`, { credentials: 'same-origin' })
       .then((r) => r.json())
       .then((j: unknown) => {
         const v = (j as { version?: unknown }).version;
@@ -107,16 +109,23 @@ export default function App() {
         <span className="viewswitch">
           <button className={view === 'board' ? 'on' : ''} onClick={() => setView('board')}>Доска</button>
           <button className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>Календарь</button>
+          <button className={view === 'docs' ? 'on' : ''} onClick={() => setView('docs')}>Документы</button>
         </span>
       </header>
       {err && <div className="error">{err}</div>}
-      {view === 'board' ? (
+      {view === 'board' && (
         <Board user={me} columns={columns} cards={cards} reload={() => load().catch(() => undefined)} setOpenId={setOpenId} />
-      ) : (
-        <Calendar cards={cards} onOpen={setOpenId} />
       )}
+      {view === 'cal' && <Calendar cards={cards} onOpen={setOpenId} />}
+      {view === 'docs' && <Docs initialPath={docPath} onOpenCard={(id) => { setView('board'); setOpenId(id); }} />}
       {openId && (
-        <CardModalHost cardId={openId} users={users} columns={columns} onClose={() => { setOpenId(null); load().catch(() => undefined); }} />
+        <CardModalHost
+          cardId={openId}
+          users={users}
+          columns={columns}
+          onClose={() => { setOpenId(null); load().catch(() => undefined); }}
+          onOpenDoc={(p) => { setDocPath(p); setView('docs'); }}
+        />
       )}
       {me.role === 'admin' && <AdminPanel users={users} reload={load} />}
     </div>
