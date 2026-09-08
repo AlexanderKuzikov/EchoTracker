@@ -61,8 +61,9 @@ export default function Calendar({ cards, onOpen }: { cards: Card[]; onOpen: (id
           const k = dayKey(d);
           const ev = eventsFor(cards, k);
           const other = d.getMonth() !== ym.m;
+          const we = d.getDay() === 0 || d.getDay() === 6;
           return (
-            <div key={k} className={'calday' + (other ? ' other' : '') + (k === todayK ? ' today' : '')}>
+            <div key={k} className={'calday' + (other ? ' other' : '') + (k === todayK ? ' today' : '') + (we ? ' we' : '')}>
               <div className="calnum">{d.getDate()}</div>
               {ev.slice(0, 3).map((e) => (
                 <div key={e.cls + e.id} className={e.cls} title={e.title} onClick={() => onOpen(e.id)}>

@@ -87,7 +87,7 @@ export default function App() {
   return (
     <div className="wrap">
       <header className="topbar">
-        <strong>EchoTracker</strong>
+        <strong><span className="logodot" />EchoTracker</strong>
         {ver !== '' && (
           <span className="muted" title="версия api — если её нет, фронт старый, обновись">
             v{ver}

@@ -19,7 +19,8 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: linear-gradient(180deg, #f7f5ef 0%, #f1eee5 100%);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
@@ -75,6 +76,24 @@ button:hover {
   border-color: var(--muted);
 }
 
+button.primary {
+  background: #23211c;
+  border-color: #23211c;
+  color: #fff;
+}
+
+button.primary:hover {
+  background: #3a372f;
+  border-color: #3a372f;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #bfd6f2;
+  border-color: var(--tech);
+}
+
 button.danger {
   color: var(--bad);
 }
@@ -104,6 +123,33 @@ button.link {
   gap: 12px;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.logodot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--tech) 0%, #7fb0ec 60%, #e8b86a 100%);
+  display: inline-block;
+}
+
+.topbar strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.modal h3 {
+  font-size: 15px;
+  margin: 18px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal h4 {
+  font-size: 14px;
+  margin: 12px 0 6px;
 }
 
 .who {
@@ -156,22 +202,46 @@ button.link {
 .calday {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   height: 108px;
   padding: 6px;
   overflow: hidden;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.calday:hover {
+  border-color: var(--tech);
+  box-shadow: var(--shadow);
 }
 
 .calday.other {
   opacity: 0.45;
+  background: transparent;
 }
 
 .calday.today {
-  outline: 2px solid var(--accent);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.calday.today .calnum {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calday.we {
+  background: #f7f4ec;
 }
 
 .calnum {
   font-size: 12px;
+  font-weight: 600;
   color: var(--muted);
   margin-bottom: 4px;
 }
@@ -228,15 +298,53 @@ button.link {
 }
 
 .colhead {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
   margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.colhead::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b9b2a2;
+  flex: none;
+}
+
+.column:nth-child(1) .colhead::before {
+  background: #8a857a;
+}
+
+.column:nth-child(2) .colhead::before {
+  background: var(--tech);
+}
+
+.column:nth-child(3) .colhead::before {
+  background: var(--wait);
+}
+
+.column:nth-child(4) .colhead::before {
+  background: var(--accent);
+}
+
+.column:nth-child(1) {
+  border-top: 3px solid #b9b2a2;
+}
+
+.column:nth-child(2) {
+  border-top: 3px solid var(--tech);
+}
+
+.column:nth-child(3) {
+  border-top: 3px solid var(--wait);
+}
+
+.column:nth-child(4) {
+  border-top: 3px solid var(--accent);
 }
 
 .count {
@@ -261,7 +369,7 @@ button.link {
 
 .card {
   border: 1px solid var(--line);
-  border-left: 3px solid transparent;
+  border-left: 3px solid #d8d2c4;
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 8px;

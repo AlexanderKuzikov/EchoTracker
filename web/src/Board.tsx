@@ -77,7 +77,7 @@ export default function Board({ user, columns, cards, reload, setOpenId }: Props
             <option value="task">Задача</option>
             <option value="request">Запрос</option>
           </select>
-          <button onClick={create}>Добавить</button>
+          <button className="primary" onClick={create}>Добавить</button>
         </div>
       )}
       {err && <div className="error">{err}</div>}

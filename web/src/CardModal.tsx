@@ -170,7 +170,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
         </div>
         <textarea rows={5} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} placeholder="Описание…" />
         <div className="row">
-          <button onClick={save}>Сохранить</button>
+          <button className="primary" onClick={save}>Сохранить</button>
           <button className="danger" onClick={remove}>Удалить</button>
           <button onClick={onClose}>Закрыть</button>
         </div>
@@ -345,7 +345,7 @@ function Feed({ card, refresh }: { card: Card; refresh: () => Promise<void> }) {
           onKeyDown={(e) => e.key === 'Enter' && send()}
           placeholder="Комментарий…"
         />
-        <button onClick={send}>Отправить</button>
+        <button className="primary" onClick={send}>Отправить</button>
       </div>
     </div>
   );
