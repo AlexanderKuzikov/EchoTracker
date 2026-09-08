@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS cards (
   assignee_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   deadline TEXT,
   requested_at TEXT,
+  started_at TEXT,
   created_by TEXT REFERENCES users(id),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -102,11 +103,16 @@ export function nextCode(db: DatabaseSync): string {
   return fmtCode(n);
 }
 
-function ensureCodes(db: DatabaseSync): void {
-  const cols = db.prepare(`PRAGMA table_info(cards)`).all() as Array<{ name: string }>;
-  if (!cols.some((c) => c.name === 'code')) {
-    db.exec('ALTER TABLE cards ADD COLUMN code TEXT');
+function ensureColumn(db: DatabaseSync, table: string, name: string, ddl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === name)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${ddl}`);
   }
+}
+
+function ensureCodes(db: DatabaseSync): void {
+  ensureColumn(db, 'cards', 'code', 'TEXT');
+  ensureColumn(db, 'cards', 'started_at', 'TEXT');
   const bare = db
     .prepare(`SELECT id FROM cards WHERE code IS NULL ORDER BY created_at, rowid`)
     .all() as Array<{ id: string }>;

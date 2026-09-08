@@ -34,6 +34,7 @@ export interface Card {
   assignee_login: string | null;
   deadline: string | null;
   requested_at: string | null;
+  started_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

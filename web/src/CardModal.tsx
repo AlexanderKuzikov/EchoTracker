@@ -17,7 +17,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
   const [showBpmn, setShowBpmn] = useState(false);
-  const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '' });
+  const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '', started_at: '' });
 
   useEffect(() => {
     api
@@ -32,6 +32,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           assignee_id: c.assignee_id ?? '',
           deadline: c.deadline ?? '',
           requested_at: c.requested_at ?? '',
+          started_at: c.started_at ?? '',
         });
       })
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)));
@@ -52,9 +53,10 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
         kind: draft.kind,
         column_id: draft.column_id,
         assignee_id: draft.assignee_id || null,
-        deadline: draft.deadline || null,
-        requested_at: draft.requested_at || null,
-      });
+          deadline: draft.deadline || null,
+          requested_at: draft.requested_at || null,
+          started_at: draft.started_at || null,
+        });
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -146,6 +148,10 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           <label>
             Дата запроса
             <input type="date" value={draft.requested_at} onChange={(e) => setDraft({ ...draft, requested_at: e.target.value })} />
+          </label>
+          <label>
+            Старт
+            <input type="date" value={draft.started_at} onChange={(e) => setDraft({ ...draft, started_at: e.target.value })} />
           </label>
         </div>
         <textarea rows={5} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} placeholder="Описание…" />

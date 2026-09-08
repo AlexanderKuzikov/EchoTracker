@@ -102,7 +102,9 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
                 onClick={() => setOpenId(c.id)}
               >
                 <div className="cardtitle">{c.title}</div>
+                {c.body.trim() !== '' && <div className="cardbody">{c.body}</div>}
                 <div className="cardmeta">
+                  {c.started_at && <span className="badge">с {fmtDate(c.started_at)}</span>}
                   {c.kind === 'request' && <span className="badge req">запрос</span>}
                   {c.waitingDays !== null && (
                     <span className={'badge' + (c.waitingDays > 3 ? ' bad' : ' wait')}>

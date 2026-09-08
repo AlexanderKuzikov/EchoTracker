@@ -191,6 +191,7 @@ interface CardRow {
   id: string;
   code: string;
   files_count: number;
+  started_at: string | null;
   title: string;
   body: string;
   column_id: string;
@@ -456,6 +457,7 @@ const server = createServer(async (req, res) => {
         assignee_id?: string | null;
         deadline?: string | null;
         requested_at?: string | null;
+        started_at?: string | null;
       };
       if (!b.title?.trim()) {
         fail(res, 400, 'title required');
@@ -478,11 +480,12 @@ const server = createServer(async (req, res) => {
         }
       }
       const now = new Date().toISOString();
+      const today = now.slice(0, 10);
       const id = randomUUID();
       const code = nextCode(db);
       db.prepare(
-        `INSERT INTO cards (id, code, title, body, column_id, kind, assignee_id, deadline, requested_at, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO cards (id, code, title, body, column_id, kind, assignee_id, deadline, requested_at, started_at, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
         code,
@@ -493,6 +496,7 @@ const server = createServer(async (req, res) => {
         b.assignee_id ?? null,
         b.deadline || null,
         b.requested_at || null,
+        b.started_at || today,
         me.id,
         now,
         now,
@@ -530,6 +534,7 @@ const server = createServer(async (req, res) => {
           assignee_id: string | null;
           deadline: string | null;
           requested_at: string | null;
+          started_at: string | null;
         }>;
         if (roleRank(me.role) < 1 && (b.title !== undefined || b.column_id !== undefined)) {
           fail(res, 403, 'read only');
@@ -592,6 +597,10 @@ const server = createServer(async (req, res) => {
         if (b.requested_at !== undefined) {
           sets.push('requested_at = ?');
           params.push(b.requested_at || null);
+        }
+        if (b.started_at !== undefined) {
+          sets.push('started_at = ?');
+          params.push(b.started_at || null);
         }
         if (sets.length > 0) {
           sets.push('updated_at = ?');
