@@ -24,6 +24,9 @@
 git clone https://github.com/AlexanderKuzikov/EchoTracker.git
 cd EchoTracker
 cp .env.example .env
+pnpm install
+pnpm --filter @echotracker/api dev   # 127.0.0.1:8100
+pnpm --filter @echotracker/web dev   # 127.0.0.1:5173
 ```
 
 ## Документация

@@ -28,8 +28,11 @@ EchoTracker/
 ├── docs/
 │   ├── CONTEXT.md
 │   └── DECISIONS.md
+├── api/src/         # zero-dep TS: server, db, auth, email (запуск без сборки)
+├── web/src/         # тонкий React: доска, модалка, md/bpmn-производные
+├── scripts/dev.ps1  # dev api+web
 ├── .env.example   # шаблон конфига, секретов нет
-└── (код позже: api/ + web/ + data/ вне git)
+└── data/ uploads/   # вне git
 ```
 
 ## Do NOT touch

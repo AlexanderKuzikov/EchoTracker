@@ -7,6 +7,10 @@ build/
 data/
 uploads/
 .env
+.env.local
+*.key
+*.pem
+credentials*
 *.log
 .DS_Store
 Thumbs.db

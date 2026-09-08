@@ -1,6 +1,6 @@
 # EchoTracker — CONTEXT
 
-> Последнее обновление: 2026-09-08 09:35 UTC
+> Последнее обновление: 2026-09-08 10:00 UTC
 
 ## Статус
 
@@ -8,10 +8,10 @@
 |-----------|--------|----------------|
 | Репозиторий | done | public, MIT, скелет + документация |
 | Стек | pinned | React 19.2.8 + Vite 8.2.2 + Node 24.20.0 LTS + bpmn-js 18 + mammoth 1.12.2 + turndown 7.2.4 + Caddy 2.11.4 + SQLite 3.53.4 (сверено 2026-09-08) |
-| Доска (api+web) | todo | v1: колонки, drag&drop, сроки, ожидание |
-| Файлы | todo | FS-папка, uuid-имена, картинки/pdf внутри, docx скачать |
-| MD-производная | todo | v1 сразу: mammoth + turndown на клиенте, оригинал цел |
-| BPMN-превью | todo | viewer-only, preview.svg + thumb.png, конвертация на клиенте, огромных схем не будет |
+| Доска (api+web) | doing | api: auth, карточки, файлы, очередь писем — smoke 17/17; web: доска, модалка, производные — scaffold без прогона |
+| Файлы | doing | FS-папка, uuid-имена, картинки/pdf внутри, docx скачать |
+| MD-производная | doing | mammoth 1.12.2 + turndown-шим на клиенте, код написан, прогон за pnpm install |
+| BPMN-превью | doing | preview.svg + thumb.png, ленивый вьювер, код написан, прогон за pnpm install |
 | Уведомления | todo | порт Notifier, адаптер Email |
 | Деплой копии | todo | шаблон + скрипт копии на проект, Caddy + LE |
 
@@ -33,6 +33,7 @@
 | 2026-09-08 | ADR: BPMN только просмотр — preview.svg + thumb.png, конвертация на клиенте, огромных схем не будет |
 | 2026-09-08 | Стек сверен со свежими релизами: React 19.2.8, Vite 8.2.2, Node 24.20.0 LTS, bpmn-js 18, mammoth 1.12.2, turndown 7.2.4, Caddy 2.11.4, SQLite 3.53.4 |
 | 2026-09-08 | ADR: бэк TS thin без Nest, Go запасной; смотрим встроенный node:sqlite |
+| 2026-09-08 | v1 написана: api zero-dep (auth, карточки, файлы, SMTP-клиент) smoke 17/17; web scaffold (доска, модалка, md/bpmn-производные); typecheck и сборка фронта за pnpm install |
 
 ## Структура проекта
 

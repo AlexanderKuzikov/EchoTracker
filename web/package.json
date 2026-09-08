@@ -1,0 +1,22 @@
+{
+  "name": "@echotracker/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "bpmn-js": "^18.19.0",
+    "mammoth": "1.12.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "turndown": "7.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}

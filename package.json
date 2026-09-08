@@ -1,0 +1,11 @@
+{
+  "name": "echotracker",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @echotracker/api dev",
+    "dev:web": "pnpm --filter @echotracker/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

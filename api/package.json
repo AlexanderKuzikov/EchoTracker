@@ -1,0 +1,18 @@
+{
+  "name": "@echotracker/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.ts",
+    "start": "node src/server.ts",
+    "build": "echo no build step for api",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

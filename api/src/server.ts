@@ -1,0 +1,717 @@
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { join, normalize, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { openDb } from './db.ts';
+import {
+  getUser,
+  roleRank,
+  hashPassword,
+  verifyPassword,
+  createSession,
+  sessionCookie,
+  seedAdmin,
+  type SessionUser,
+} from './auth.ts';
+import { enqueue, pumpOutbox, sweepReminders, type SmtpEnv } from './email.ts';
+
+const VERSION = '0.1.0';
+
+const env = {
+  port: Number(process.env['PORT'] ?? 8100),
+  dataDir: process.env['DATA_DIR'] ?? './data',
+  uploadsDir: process.env['UPLOADS_DIR'] ?? './uploads',
+  adminLogin: process.env['ADMIN_LOGIN'] ?? '',
+  adminPass: process.env['ADMIN_PASS'] ?? '',
+  adminEmail: process.env['ADMIN_EMAIL'] ?? '',
+  cookieSecure: process.env['COOKIE_SECURE'] === '1',
+  baseUrl: process.env['BASE_URL'] ?? '',
+  warnDays: Number(process.env['WAITING_WARN_DAYS'] ?? 3),
+  workerMs: Number(process.env['OUTBOX_INTERVAL_MS'] ?? 60000),
+};
+
+const smtp: SmtpEnv | null =
+  process.env['SMTP_HOST'] && process.env['SMTP_USER'] && process.env['SMTP_PASS']
+    ? {
+        host: process.env['SMTP_HOST'],
+        port: Number(process.env['SMTP_PORT'] ?? 465),
+        user: process.env['SMTP_USER'],
+        pass: process.env['SMTP_PASS'],
+        from: process.env['SMTP_FROM'] ?? process.env['SMTP_USER'],
+        insecure: process.env['SMTP_INSECURE'] === '1',
+      }
+    : null;
+
+const db = openDb(join(env.dataDir, 'echotracker.sqlite'));
+mkdirSync(env.uploadsDir, { recursive: true });
+const seeded = seedAdmin(db, env.adminLogin, env.adminPass, env.adminEmail);
+if (seeded) console.log(`seeded admin ${seeded.login}`);
+
+const MAX_FILE = 15 * 1024 * 1024;
+const ALLOWED_MIME = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/markdown',
+]);
+const FILE_KINDS = new Set(['original', 'md', 'svg', 'thumb']);
+
+function log(s: string): void {
+  console.log(new Date().toISOString(), s);
+}
+
+function json(res: ServerResponse, code: number, obj: unknown): void {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(body);
+}
+
+function fail(res: ServerResponse, code: number, msg: string): void {
+  json(res, code, { error: msg });
+}
+
+function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > limit) {
+        req.destroy();
+        reject(new Error('too large'));
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+interface Part {
+  name: string;
+  filename?: string;
+  mime?: string;
+  data: Buffer;
+}
+
+function parseDisposition(head: string): { name: string; filename?: string } {
+  let name = '';
+  let filename: string | undefined;
+  const mStar = head.match(/filename\*=UTF-8''([^;\r\n]+)/i);
+  if (mStar?.[1]) {
+    try {
+      filename = decodeURIComponent(mStar[1].replace(/\+/g, ' '));
+    } catch {
+      /* берём как есть ниже */
+    }
+  }
+  for (const line of head.split('\r\n')) {
+    const m = line.match(/content-disposition:\s*form-data;\s*(.*)/i);
+    if (!m?.[1]) continue;
+    for (const seg of m[1].split(';')) {
+      const nm = seg.trim().match(/^name="([^"]*)"/);
+      if (nm?.[1] !== undefined) name = nm[1];
+      const fn = seg.trim().match(/^filename="([^"]*)"/);
+      if (fn?.[1] !== undefined && filename === undefined) filename = fn[1];
+    }
+  }
+  return { name, filename };
+}
+
+function parseMultipart(body: Buffer, boundary: string): Part[] {
+  const out: Part[] = [];
+  const delim = Buffer.from('--' + boundary);
+  const close = Buffer.from('--' + boundary + '--');
+  let pos = body.indexOf(delim);
+  while (pos >= 0) {
+    if (body.subarray(pos, pos + close.length).equals(close)) break;
+    let p = pos + delim.length;
+    if (body[p] === 13 && body[p + 1] === 10) p += 2;
+    const headEnd = body.indexOf('\r\n\r\n', p);
+    if (headEnd < 0) break;
+    const head = body.subarray(p, headEnd).toString('utf8');
+    const mime = head.match(/content-type:\s*([^\r\n;]+)/i)?.[1]?.trim().toLowerCase();
+    const { name, filename } = parseDisposition(head);
+    const dataStart = headEnd + 4;
+    const needle = Buffer.concat([Buffer.from('\r\n'), delim]);
+    const next = body.indexOf(needle, dataStart);
+    if (next < 0) break;
+    out.push({ name, filename, mime, data: body.subarray(dataStart, next) });
+    pos = next + 2;
+  }
+  return out;
+}
+
+interface CardRow {
+  id: string;
+  title: string;
+  body: string;
+  column_id: string;
+  kind: string;
+  assignee_id: string | null;
+  assignee_login: string | null;
+  assignee_email: string | null;
+  deadline: string | null;
+  requested_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function daysSince(iso: string): number {
+  return Math.floor((Date.now() - Date.parse(iso)) / (24 * 3600 * 1000));
+}
+
+function withComputed(c: CardRow): Record<string, unknown> {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    ...c,
+    overdue: c.deadline !== null && c.deadline < today && c.column_id !== 'done',
+    waitingDays:
+      c.column_id === 'waiting' && c.requested_at ? daysSince(c.requested_at) : null,
+  };
+}
+
+function visibleTo(user: SessionUser): { sql: string; params: string[] } {
+  if (roleRank(user.role) >= 1) return { sql: '1=1', params: [] };
+  return { sql: '(c.created_by = ? OR c.assignee_id = ?)', params: [user.id, user.id] };
+}
+
+function getCard(id: string): CardRow | undefined {
+  return db
+    .prepare(
+      `SELECT c.*, u.login AS assignee_login, u.email AS assignee_email FROM cards c
+       LEFT JOIN users u ON u.id = c.assignee_id WHERE c.id = ?`,
+    )
+    .get(id) as CardRow | undefined;
+}
+
+function canSeeCard(user: SessionUser, card: CardRow): boolean {
+  if (roleRank(user.role) >= 1) return true;
+  return card.created_by === user.id || card.assignee_id === user.id;
+}
+
+function cardFiles(cardId: string): unknown[] {
+  return db
+    .prepare(
+      `SELECT id, card_id, kind, orig_name, mime, size, created_by, created_at
+       FROM files WHERE card_id = ? ORDER BY created_at`,
+    )
+    .all(cardId) as unknown[];
+}
+
+const loginHits = new Map<string, number[]>();
+
+function loginAllowed(ip: string): boolean {
+  const now = Date.now();
+  const hits = (loginHits.get(ip) ?? []).filter((t) => now - t < 5 * 60 * 1000);
+  hits.push(now);
+  loginHits.set(ip, hits);
+  return hits.length <= 10;
+}
+
+const MIME_STATIC: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.ico': 'image/x-icon',
+  '.json': 'application/json',
+  '.map': 'application/json',
+  '.bpmn': 'application/xml',
+  '.md': 'text/markdown; charset=utf-8',
+};
+
+const webRoot = fileURLToPath(new URL('../../web/dist', import.meta.url));
+
+function serveStatic(pathname: string, res: ServerResponse): void {
+  let rel = decodeURIComponent(pathname);
+  if (rel === '/') rel = '/index.html';
+  const full = normalize(join(webRoot, rel));
+  if (!full.startsWith(webRoot)) {
+    fail(res, 403, 'forbidden');
+    return;
+  }
+  if (existsSync(full)) {
+    const data = readFileSync(full);
+    res.writeHead(200, { 'Content-Type': MIME_STATIC[extname(full)] ?? 'application/octet-stream' });
+    res.end(data);
+    return;
+  }
+  const index = join(webRoot, 'index.html');
+  if (existsSync(index)) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(readFileSync(index));
+    return;
+  }
+  fail(res, 503, 'web not built');
+}
+
+const server = createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const path = url.pathname;
+    const method = req.method ?? 'GET';
+    const ip = req.socket.remoteAddress ?? '?';
+
+    if (path === '/api/health' && method === 'GET') {
+      json(res, 200, { ok: true, version: VERSION });
+      return;
+    }
+
+    if (path === '/api/auth/login' && method === 'POST') {
+      if (!loginAllowed(ip)) {
+        fail(res, 429, 'too many attempts');
+        return;
+      }
+      const body = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) as {
+        login?: string;
+        pass?: string;
+      };
+      const row = db.prepare('SELECT * FROM users WHERE login = ?').get(
+        (body.login ?? '').trim(),
+      ) as
+        | { id: string; login: string; email: string | null; pass_salt: string; pass_hash: string; role: string }
+        | undefined;
+      if (!row || !verifyPassword(body.pass ?? '', row.pass_salt, row.pass_hash)) {
+        fail(res, 401, 'bad credentials');
+        return;
+      }
+      const sid = createSession(db, row.id);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Set-Cookie': sessionCookie(sid, env.cookieSecure),
+      });
+      res.end(JSON.stringify({ id: row.id, login: row.login, email: row.email, role: row.role }));
+      return;
+    }
+
+    const me = getUser(db, req);
+    if (!me) {
+      if (path.startsWith('/api/')) {
+        fail(res, 401, 'auth required');
+        return;
+      }
+      serveStatic(path, res);
+      return;
+    }
+
+    if (path === '/api/auth/logout' && method === 'POST') {
+      const sid = (req.headers.cookie ?? '').match(/et_sid=([^;]+)/)?.[1];
+      if (sid) db.prepare('DELETE FROM sessions WHERE id = ?').run(sid);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Set-Cookie': 'et_sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
+      });
+      res.end('{}');
+      return;
+    }
+
+    if (path === '/api/auth/me' && method === 'GET') {
+      json(res, 200, me);
+      return;
+    }
+
+    if (path === '/api/users' && method === 'GET') {
+      if (me.role !== 'admin') {
+        fail(res, 403, 'admin only');
+        return;
+      }
+      json(
+        res,
+        200,
+        db.prepare('SELECT id, login, email, role, created_at FROM users ORDER BY login').all(),
+      );
+      return;
+    }
+
+    if (path === '/api/users' && method === 'POST') {
+      if (me.role !== 'admin') {
+        fail(res, 403, 'admin only');
+        return;
+      }
+      const b = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) as {
+        login?: string;
+        pass?: string;
+        email?: string;
+        role?: string;
+      };
+      if (!b.login?.trim() || !b.pass || b.pass.length < 8) {
+        fail(res, 400, 'login and pass>=8 required');
+        return;
+      }
+      const role = ['admin', 'member', 'watcher'].includes(b.role ?? '') ? b.role! : 'member';
+      const { salt, hash } = hashPassword(b.pass);
+      try {
+        db.prepare(
+          'INSERT INTO users (id, login, email, pass_salt, pass_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ).run(randomUUID(), b.login.trim(), b.email?.trim() || null, salt, hash, role, new Date().toISOString());
+      } catch {
+        fail(res, 409, 'login taken');
+        return;
+      }
+      json(res, 201, { ok: true });
+      return;
+    }
+
+    if (path === '/api/columns' && method === 'GET') {
+      json(res, 200, db.prepare('SELECT id, title, pos FROM columns ORDER BY pos').all());
+      return;
+    }
+
+    if (path === '/api/columns' && method === 'PUT') {
+      if (roleRank(me.role) < 1) {
+        fail(res, 403, 'read only');
+        return;
+      }
+      const b = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) as Array<{
+        id?: string;
+        title?: string;
+      }>;
+      if (!Array.isArray(b) || b.length === 0) {
+        fail(res, 400, 'columns array required');
+        return;
+      }
+      const upd = db.prepare('UPDATE columns SET title = ?, pos = ? WHERE id = ?');
+      b.forEach((c, i) => {
+        if (c.id && c.title?.trim()) upd.run(c.title.trim(), i, c.id);
+      });
+      json(res, 200, { ok: true });
+      return;
+    }
+
+    if (path === '/api/cards' && method === 'GET') {
+      const v = visibleTo(me);
+      const rows = db
+        .prepare(
+          `SELECT c.*, u.login AS assignee_login, u.email AS assignee_email FROM cards c
+           LEFT JOIN users u ON u.id = c.assignee_id WHERE ${v.sql} ORDER BY c.updated_at DESC`,
+        )
+        .all(...v.params) as CardRow[];
+      json(res, 200, rows.map(withComputed));
+      return;
+    }
+
+    if (path === '/api/cards' && method === 'POST') {
+      const b = JSON.parse((await readBody(req, 256 * 1024)).toString('utf8')) as {
+        title?: string;
+        body?: string;
+        column_id?: string;
+        kind?: string;
+        assignee_id?: string | null;
+        deadline?: string | null;
+        requested_at?: string | null;
+      };
+      if (!b.title?.trim()) {
+        fail(res, 400, 'title required');
+        return;
+      }
+      const col = b.column_id ?? 'incoming';
+      const colExists = db.prepare('SELECT id FROM columns WHERE id = ?').get(col);
+      if (!colExists) {
+        fail(res, 400, 'bad column');
+        return;
+      }
+      const kind = b.kind === 'request' ? 'request' : 'task';
+      if (b.assignee_id) {
+        const u = db.prepare('SELECT id, email FROM users WHERE id = ?').get(b.assignee_id) as
+          | { id: string; email: string | null }
+          | undefined;
+        if (!u) {
+          fail(res, 400, 'bad assignee');
+          return;
+        }
+      }
+      const now = new Date().toISOString();
+      const id = randomUUID();
+      db.prepare(
+        `INSERT INTO cards (id, title, body, column_id, kind, assignee_id, deadline, requested_at, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        b.title.trim(),
+        b.body ?? '',
+        col,
+        kind,
+        b.assignee_id ?? null,
+        b.deadline || null,
+        b.requested_at || null,
+        me.id,
+        now,
+        now,
+      );
+      if (b.assignee_id && b.assignee_id !== me.id) {
+        const u = db.prepare('SELECT email FROM users WHERE id = ?').get(b.assignee_id) as {
+          email: string | null;
+        };
+        if (u?.email) {
+          enqueue(db, u.email, `Новая карточка: ${b.title.trim()}`, `Тебе назначили «${b.title.trim()}».\n${baseUrl()}/#${id}`);
+        }
+      }
+      const created = getCard(id);
+      json(res, 201, withComputed(created!));
+      return;
+    }
+
+    const cardMatch = path.match(/^\/api\/cards\/([^/]+)(\/files)?$/);
+    if (cardMatch?.[1]) {
+      const card = getCard(cardMatch[1]);
+      if (!card || !canSeeCard(me, card)) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      if (!cardMatch[2] && method === 'GET') {
+        json(res, 200, { ...withComputed(card), files: cardFiles(card.id) });
+        return;
+      }
+      if (!cardMatch[2] && method === 'PATCH') {
+        const b = JSON.parse((await readBody(req, 256 * 1024)).toString('utf8')) as Partial<{
+          title: string;
+          body: string;
+          column_id: string;
+          kind: string;
+          assignee_id: string | null;
+          deadline: string | null;
+          requested_at: string | null;
+        }>;
+        if (roleRank(me.role) < 1 && (b.title !== undefined || b.column_id !== undefined)) {
+          fail(res, 403, 'read only');
+          return;
+        }
+        const sets: string[] = [];
+        const params: unknown[] = [];
+        if (b.title !== undefined) {
+          if (!b.title.trim()) {
+            fail(res, 400, 'empty title');
+            return;
+          }
+          sets.push('title = ?');
+          params.push(b.title.trim());
+        }
+        if (b.body !== undefined) {
+          sets.push('body = ?');
+          params.push(b.body);
+        }
+        if (b.column_id !== undefined) {
+          const colExists = db.prepare('SELECT id FROM columns WHERE id = ?').get(b.column_id);
+          if (!colExists) {
+            fail(res, 400, 'bad column');
+            return;
+          }
+          sets.push('column_id = ?');
+          params.push(b.column_id);
+          if (b.column_id === 'waiting' && !card.requested_at && b.requested_at === undefined) {
+            sets.push('requested_at = ?');
+            params.push(new Date().toISOString().slice(0, 10));
+          }
+        }
+        if (b.kind !== undefined) {
+          sets.push('kind = ?');
+          params.push(b.kind === 'request' ? 'request' : 'task');
+        }
+        if (b.assignee_id !== undefined) {
+          if (b.assignee_id) {
+            const u = db.prepare('SELECT id FROM users WHERE id = ?').get(b.assignee_id);
+            if (!u) {
+              fail(res, 400, 'bad assignee');
+              return;
+            }
+          }
+          sets.push('assignee_id = ?');
+          params.push(b.assignee_id);
+          if (b.assignee_id && b.assignee_id !== card.assignee_id && b.assignee_id !== me.id) {
+            const u = db.prepare('SELECT email FROM users WHERE id = ?').get(b.assignee_id) as {
+              email: string | null;
+            };
+            if (u?.email) {
+              enqueue(db, u.email, `Назначена карточка: ${card.title}`, `Тебе назначили «${card.title}».\n${baseUrl()}/#${card.id}`);
+            }
+          }
+        }
+        if (b.deadline !== undefined) {
+          sets.push('deadline = ?');
+          params.push(b.deadline || null);
+        }
+        if (b.requested_at !== undefined) {
+          sets.push('requested_at = ?');
+          params.push(b.requested_at || null);
+        }
+        if (sets.length > 0) {
+          sets.push('updated_at = ?');
+          params.push(new Date().toISOString());
+          params.push(card.id);
+          db.prepare(`UPDATE cards SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+        }
+        const updated = getCard(card.id);
+        json(res, 200, { ...withComputed(updated!), files: cardFiles(card.id) });
+        return;
+      }
+      if (!cardMatch[2] && method === 'DELETE') {
+        if (roleRank(me.role) < 1) {
+          fail(res, 403, 'read only');
+          return;
+        }
+        const rows = db.prepare('SELECT id FROM files WHERE card_id = ?').all(card.id) as Array<{
+          id: string;
+        }>;
+        db.prepare('DELETE FROM cards WHERE id = ?').run(card.id);
+        for (const r of rows) {
+          try {
+            unlinkSync(join(env.uploadsDir, r.id));
+          } catch {
+            /* файла уже нет */
+          }
+        }
+        json(res, 200, { ok: true });
+        return;
+      }
+      if (cardMatch[2] && method === 'POST') {
+        if (roleRank(me.role) < 1 && card.created_by !== me.id && card.assignee_id !== me.id) {
+          fail(res, 403, 'read only');
+          return;
+        }
+        const ct = req.headers['content-type'] ?? '';
+        const m = ct.match(/boundary=(.+)$/);
+        if (!m?.[1]) {
+          fail(res, 400, 'multipart required');
+          return;
+        }
+        const parts = parseMultipart(await readBody(req, MAX_FILE + 1024 * 1024), m[1]);
+        const file = parts.find((p) => p.filename);
+        if (!file?.filename) {
+          fail(res, 400, 'file required');
+          return;
+        }
+        if (file.data.length > MAX_FILE) {
+          fail(res, 413, 'file too large');
+          return;
+        }
+        const kindRaw = parts.find((p) => p.name === 'kind')?.data.toString('utf8').trim() ?? 'original';
+        const kind = FILE_KINDS.has(kindRaw) ? kindRaw : 'original';
+        const mime = file.mime || 'application/octet-stream';
+        if (!ALLOWED_MIME.has(mime)) {
+          fail(res, 415, `mime not allowed: ${mime}`);
+          return;
+        }
+        if (kind !== 'original') {
+          const olds = db.prepare('SELECT id FROM files WHERE card_id = ? AND kind = ?').all(card.id, kind) as Array<{
+            id: string;
+          }>;
+          db.prepare('DELETE FROM files WHERE card_id = ? AND kind = ?').run(card.id, kind);
+          for (const o of olds) {
+            try {
+              unlinkSync(join(env.uploadsDir, o.id));
+            } catch {
+              /* файла уже нет */
+            }
+          }
+        }
+        const fid = randomUUID();
+        const now = new Date().toISOString();
+        writeFileSync(join(env.uploadsDir, fid), file.data);
+        db.prepare(
+          `INSERT INTO files (id, card_id, kind, orig_name, mime, size, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(fid, card.id, kind, file.filename, mime, file.data.length, me.id, now);
+        db.prepare('UPDATE cards SET updated_at = ? WHERE id = ?').run(now, card.id);
+        json(res, 201, { id: fid, card_id: card.id, kind, orig_name: file.filename, mime, size: file.data.length, created_at: now });
+        return;
+      }
+    }
+
+    const fileMatch = path.match(/^\/api\/files\/([^/]+)$/);
+    if (fileMatch?.[1]) {
+      const row = db.prepare('SELECT * FROM files WHERE id = ?').get(fileMatch[1]) as
+        | { id: string; card_id: string; orig_name: string; mime: string; size: number }
+        | undefined;
+      if (!row) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      const card = getCard(row.card_id);
+      if (!card || !canSeeCard(me, card)) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      if (method === 'GET') {
+        const full = join(env.uploadsDir, row.id);
+        if (!existsSync(full)) {
+          fail(res, 404, 'file lost');
+          return;
+        }
+        const inline = row.mime.startsWith('image/') || row.mime === 'application/pdf' || row.mime === 'image/svg+xml';
+        res.writeHead(200, {
+          'Content-Type': row.mime,
+          'Content-Length': row.size,
+          'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(row.orig_name)}`,
+        });
+        res.end(readFileSync(full));
+        return;
+      }
+      if (method === 'DELETE') {
+        if (roleRank(me.role) < 1) {
+          fail(res, 403, 'read only');
+          return;
+        }
+        db.prepare('DELETE FROM files WHERE id = ?').run(row.id);
+        try {
+          unlinkSync(join(env.uploadsDir, row.id));
+        } catch {
+          /* файла уже нет */
+        }
+        json(res, 200, { ok: true });
+        return;
+      }
+    }
+
+    if (path === '/api/outbox' && method === 'GET') {
+      if (me.role !== 'admin') {
+        fail(res, 403, 'admin only');
+        return;
+      }
+      json(res, 200, db.prepare('SELECT id, to_addr, subject, status, attempts, next_try, created_at FROM outbox ORDER BY created_at DESC LIMIT 50').all());
+      return;
+    }
+
+    if (path.startsWith('/api/')) {
+      fail(res, 404, 'unknown api');
+      return;
+    }
+    if (method === 'GET') {
+      serveStatic(path, res);
+      return;
+    }
+    fail(res, 404, 'not found');
+  } catch (e) {
+    console.error(e);
+    if (!res.headersSent) fail(res, 500, 'internal');
+    else res.end();
+  }
+});
+
+function baseUrl(): string {
+  return env.baseUrl || `http://127.0.0.1:${env.port}`;
+}
+
+async function tick(): Promise<void> {
+  try {
+    sweepReminders(db, baseUrl(), env.warnDays);
+    await pumpOutbox(db, smtp, log);
+  } catch (e) {
+    log(`worker: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+server.listen(env.port, '127.0.0.1', () => {
+  console.log(`echotracker ${VERSION} on 127.0.0.1:${env.port}`);
+  setTimeout(tick, 3000).unref?.();
+  setInterval(tick, env.workerMs).unref?.();
+});
