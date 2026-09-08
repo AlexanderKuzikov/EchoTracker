@@ -76,16 +76,21 @@ export default function Docs({ initialPath, onOpenCard }: Props) {
       {err && <div className="error">{err}</div>}
       <div className="docscols">
         <div className="docslist">
-          {list.map((d) => (
-            <div
-              key={d.path}
-              className={'doctab' + (d.path === path ? ' on' : '')}
-              onClick={() => setPath(d.path)}
-            >
-              <div>{d.title}</div>
-              <div className="muted">{d.path}</div>
-            </div>
-          ))}
+          {list.map((d) => {
+            const base = d.path.split('/').pop() ?? d.path;
+            return (
+              <div
+                key={d.path}
+                className={'doctab' + (d.path === path ? ' on' : '')}
+                onClick={() => setPath(d.path)}
+              >
+                <div className="filerow">
+                  <span className="fileext">md</span>
+                  <span>{base.replace(/\.md$/i, '')}</span>
+                </div>
+              </div>
+            );
+          })}
           {list.length === 0 && <div className="muted">Документов рядом нет — положи docs в проект</div>}
         </div>
         <div className="docview">

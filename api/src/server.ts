@@ -52,6 +52,7 @@ function normBase(v: string | undefined): string {
 const env = {
   port: Number(process.env['PORT'] ?? 8100),
   base: normBase(process.env['ECHO_BASE']),
+  board: (process.env['BOARD_NAME'] ?? '').trim(),
   dataDir: process.env['DATA_DIR'] ?? './data',
   uploadsDir: process.env['UPLOADS_DIR'] ?? './uploads',
   docsDir: process.env['DOCS_DIR'] ?? '../../docs',
@@ -381,7 +382,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (path === '/api/health' && method === 'GET') {
-      json(res, 200, { ok: true, version: VERSION });
+      json(res, 200, { ok: true, version: VERSION, board: env.board });
       return;
     }
 
@@ -1074,7 +1075,9 @@ interface DocEntry {
 }
 
 function docTitle(file: string, content: string): string {
-  const m = content.match(/^#\s+(.+)$/m);
+  const m = content
+    .replace(/```[\s\S]*?```/g, '')
+    .match(/^#\s+(.+)$/m);
   if (m?.[1]) return m[1].trim().slice(0, 80);
   return file;
 }

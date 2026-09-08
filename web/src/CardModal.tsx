@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState, type ClipboardEvent } from 'react';
 import { api, type Card, type CheckItem, type Column, type FileRow, type User } from './api';
 import NoFill from './NoFill';
 import { baseName, bpmnToSvg, docxToMarkdown, hasBpmnLayout, svgHasContent, svgToPng } from './derivatives';
@@ -75,6 +75,19 @@ export default function CardModalHost({ cardId, users, columns, onClose, onOpenD
     onClose();
   }
 
+  function shotName(type: string): string {
+    const ext = type === 'image/jpeg' ? 'jpg' : type === 'image/gif' ? 'gif' : type === 'image/webp' ? 'webp' : 'png';
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `screenshot-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;
+  }
+
+  async function onPaste(e: ClipboardEvent) {
+    const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (imgs.length === 0 || !card) return;
+    for (const f of imgs) await onPick(new File([f], shotName(f.type), { type: f.type }));
+  }
+
   async function onPick(f: File) {
     if (!card) return;
     setErr('');
@@ -115,7 +128,7 @@ export default function CardModalHost({ cardId, users, columns, onClose, onOpenD
   if (!card) {
     return (
       <div className="backdrop" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} onPaste={onPaste}>
           {err || 'Загрузка…'}
         </div>
       </div>
@@ -201,6 +214,7 @@ export default function CardModalHost({ cardId, users, columns, onClose, onOpenD
             e.target.value = '';
           }}
         />
+        <div className="muted">Скриншот из буфера вставляется через Ctrl+V</div>
         {busy && <div className="busy">{busy}</div>}
         {note && <div className="muted">{note}</div>}
         <ul className="files">

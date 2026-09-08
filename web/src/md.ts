@@ -15,6 +15,9 @@ function inline(raw: string): string {
     .replace(/(^|[^*\w])\*([^*\n]+)\*/g, '$1<em>$2</em>')
     .replace(/(^|[^_\w])_([^_\n]+)_/g, '$1<em>$2</em>')
     .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, a: string, u: string) =>
+      /^(https?:)/i.test(u) ? `<img src="${u}" alt="${a}" loading="lazy"/>` : a,
+    )
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, t: string, u: string) =>
       /^(https?:|mailto:)/i.test(u)
         ? `<a href="${u}" target="_blank" rel="noreferrer">${t}</a>`
@@ -68,6 +71,19 @@ export function renderMarkdown(md: string): string {
     }
     if (inCode) {
       codeBuf.push(line);
+      i++;
+      continue;
+    }
+    // techdebt: сырой HTML не рендерим — однострочные теги чистим до текста,
+    // иначе шапки вроде бейджей в README лезут наружу мусором
+    if (line.trim().startsWith('<')) {
+      flush();
+      closeList();
+      const hm = line.trim().match(/^<h([1-3])[^>]*>([\s\S]*)<\/h[1-3]>$/);
+      const text = (hm?.[2] ?? line).replace(/<[^>]*>/g, '').trim();
+      if (text) {
+        html += hm?.[1] ? `<h${hm[1]}>${inline(text)}</h${hm[1]}>` : `<p>${inline(text)}</p>`;
+      }
       i++;
       continue;
     }

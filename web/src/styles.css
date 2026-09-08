@@ -259,6 +259,33 @@ button.link {
   font-size: 16px;
 }
 
+.projlogo {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.projname {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: linear-gradient(100deg, var(--tech) 25%, #7fb0ec 50%, var(--tech) 75%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: projshine 5s ease-in-out infinite;
+}
+
+@keyframes projshine {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .projname { animation: none; }
+}
+
 .modal h3 {
   font-size: 15px;
   margin: 18px 0 8px;
