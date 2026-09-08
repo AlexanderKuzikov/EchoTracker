@@ -118,8 +118,9 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
     );
   }
   const originals = (card.files ?? []).filter((x) => x.kind === 'original');
-  const md = (card.files ?? []).find((x) => x.kind === 'md')
-    ?? (card.files ?? []).find((x) => x.kind === 'original' && (x.orig_name.toLowerCase().endsWith('.md') || x.mime === 'text/markdown'));
+  const mdFiles = (card.files ?? []).filter(
+    (x) => x.kind === 'md' || (x.kind === 'original' && (x.orig_name.toLowerCase().endsWith('.md') || x.mime === 'text/markdown')),
+  );
   const svg = (card.files ?? []).find((x) => x.kind === 'svg');
   const bpmnSrc = (card.files ?? []).find((x) => x.orig_name.toLowerCase().endsWith('.bpmn'));
 
@@ -203,7 +204,9 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
             </li>
           ))}
         </ul>
-        {md && <MdPreview id={md.id} name={md.orig_name} />}
+        {mdFiles.map((m) => (
+          <MdPreview key={m.id} id={m.id} name={m.orig_name} />
+        ))}
         {svg && (
           <div>
             <h4>Схема</h4>

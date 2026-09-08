@@ -12,7 +12,36 @@ export async function docxToMarkdown(buf: ArrayBuffer): Promise<string> {
   const mammoth = (await import('mammoth')).default;
   const { default: TurndownService } = await import('turndown');
   const { value: html } = await mammoth.convertToHtml({ arrayBuffer: buf });
-  return new TurndownService({ headingStyle: 'atx' }).turndown(html);
+  const { text, tables } = extractTables(html);
+  const td = new TurndownService({ headingStyle: 'atx' });
+  let md = td.turndown(text);
+  tables.forEach((t, i) => {
+    md = md.replace(`@@TABLE${i}@@`, `\n${t}\n`);
+  });
+  return md;
+}
+
+function tableToPipe(tableHtml: string): string {
+  const doc = new DOMParser().parseFromString(tableHtml, 'text/html');
+  const rows = Array.from(doc.querySelectorAll('tr')).map(
+    (tr) =>
+      `| ${Array.from(tr.querySelectorAll('th, td'))
+        .map((c) => (c.textContent ?? '').trim().replace(/\|/g, '\\|').replace(/\s+/g, ' '))
+        .join(' | ')} |`,
+  );
+  if (rows.length === 0) return '';
+  const cols = Math.max(1, (rows[0] as string).split('|').length - 2);
+  rows.splice(1, 0, `| ${Array(cols).fill('---').join(' | ')} |`);
+  return rows.join('\n');
+}
+
+function extractTables(html: string): { text: string; tables: string[] } {
+  const tables: string[] = [];
+  const text = html.replace(/<table[\s\S]*?<\/table>/gi, (m) => {
+    tables.push(tableToPipe(m));
+    return `\n\n@@TABLE${tables.length - 1}@@\n\n`;
+  });
+  return { text, tables };
 }
 
 export function hasBpmnLayout(xml: string): boolean {

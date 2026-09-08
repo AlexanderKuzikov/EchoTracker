@@ -64,11 +64,11 @@ export default function App() {
         {err && <div className="error">{err}</div>}
         <label>
           Логин
-          <input value={login} onChange={(e) => setLogin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
+          <input name="username" autoComplete="username" value={login} onChange={(e) => setLogin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
         </label>
         <label>
           Пароль
-          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
+          <input name="password" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
         </label>
         <button onClick={doLogin}>Войти</button>
       </div>

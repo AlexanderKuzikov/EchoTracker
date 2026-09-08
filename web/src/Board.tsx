@@ -66,6 +66,8 @@ export default function Board({ user, columns, cards, reload, setOpenId }: Props
       {canEdit && (
         <div className="composer">
           <input
+            name="echotracker-new-card"
+            autoComplete="off"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && create()}

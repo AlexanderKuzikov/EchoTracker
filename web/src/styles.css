@@ -403,11 +403,11 @@ button.link {
 .modal {
   background: var(--panel);
   border-radius: 10px;
-  max-width: 760px;
-  width: 100%;
-  max-height: calc(100vh - 80px);
+  max-width: 1180px;
+  width: 94vw;
+  max-height: calc(100vh - 60px);
   overflow: auto;
-  padding: 16px;
+  padding: 20px 24px;
 }
 
 .modaltitle {
