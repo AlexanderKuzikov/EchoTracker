@@ -21,6 +21,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<'board' | 'cal'>('board');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [ver, setVer] = useState('');
 
   const load = useCallback(async () => {
     const [u, cols, list] = await Promise.all([api.users().catch(() => [] as User[]), api.columns(), api.cards()]);
@@ -40,6 +41,13 @@ export default function App() {
         if (!(e instanceof AuthError)) setErr(e instanceof Error ? e.message : String(e));
       })
       .finally(() => setReady(true));
+    fetch('/api/health', { credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((j: unknown) => {
+        const v = (j as { version?: unknown }).version;
+        if (typeof v === 'string') setVer(v);
+      })
+      .catch(() => undefined);
   }, [load]);
 
   async function doLogin() {
@@ -79,6 +87,11 @@ export default function App() {
     <div className="wrap">
       <header className="topbar">
         <strong>EchoTracker</strong>
+        {ver !== '' && (
+          <span className="muted" title="версия api — если её нет, фронт старый, обновись">
+            v{ver}
+          </span>
+        )}
         <span className="who" title="Твой логин">
           <span className="avatar">{initials(me.login)}</span>
           {me.login}

@@ -40,7 +40,7 @@ function loadEnvFile(): void {
 
 loadEnvFile();
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 const env = {
   port: Number(process.env['PORT'] ?? 8100),
