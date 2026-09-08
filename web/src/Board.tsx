@@ -113,7 +113,7 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
                   )}
                   {c.deadline && <span className={'badge' + (c.overdue ? ' bad' : '')}>до {fmtDate(c.deadline)}</span>}
                 </div>
-                {(c.assignee_login || c.files_count > 0) && (
+                {(c.assignee_login || c.files_count > 0 || c.comments_count > 0 || c.checklist_total > 0) && (
                   <div className="cardfoot">
                     {c.assignee_login && (
                       <span className="assignee">
@@ -121,9 +121,13 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
                         {c.assignee_login}
                       </span>
                     )}
-                    {c.files_count > 0 && (
-                      <span className="muted">{plural(c.files_count, 'файл', 'файла', 'файлов')}</span>
-                    )}
+                    <span className="muted">
+                      {c.checklist_total > 0 && `✓ ${c.checklist_total - c.checklist_open}/${c.checklist_total}`}
+                      {c.checklist_total > 0 && (c.files_count > 0 || c.comments_count > 0) && ' · '}
+                      {c.files_count > 0 && `${plural(c.files_count, 'файл', 'файла', 'файлов')}`}
+                      {c.files_count > 0 && c.comments_count > 0 && ' · '}
+                      {c.comments_count > 0 && `${c.comments_count} комм.`}
+                    </span>
                   </div>
                 )}
               </div>

@@ -60,6 +60,33 @@ CREATE TABLE IF NOT EXISTS outbox (
   next_try INTEGER NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS comments (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  author_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_comments_card ON comments(card_id);
+CREATE TABLE IF NOT EXISTS checklist (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0,
+  pos INTEGER NOT NULL,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checklist_card ON checklist(card_id);
+CREATE TABLE IF NOT EXISTS activity (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_activity_card ON activity(card_id);
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL

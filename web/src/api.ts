@@ -22,6 +22,29 @@ export interface FileRow {
   created_at: string;
 }
 
+export interface CommentRow {
+  id: string;
+  body: string;
+  author: string | null;
+  created_at: string;
+}
+
+export interface ActivityRow {
+  id: string;
+  kind: string;
+  detail: string;
+  actor: string | null;
+  created_at: string;
+}
+
+export interface CheckItem {
+  id: string;
+  text: string;
+  done: number;
+  pos: number;
+  created_at: string;
+}
+
 export interface Card {
   id: string;
   code: string;
@@ -41,6 +64,12 @@ export interface Card {
   overdue: boolean;
   waitingDays: number | null;
   files?: FileRow[];
+  comments?: CommentRow[];
+  activity?: ActivityRow[];
+  checklist?: CheckItem[];
+  comments_count: number;
+  checklist_open: number;
+  checklist_total: number;
 }
 
 export class AuthError extends Error {}
@@ -107,4 +136,14 @@ export const api = {
     return (await r.json()) as FileRow;
   },
   deleteFile: (id: string) => req<{ ok: boolean }>(`/api/files/${id}`, { method: 'DELETE' }),
+  addComment: (cardId: string, body: string) => post<CommentRow>(`/api/cards/${cardId}/comments`, { body }),
+  deleteComment: (id: string) => req<{ ok: boolean }>(`/api/comments/${id}`, { method: 'DELETE' }),
+  addCheck: (cardId: string, text: string) => post<CheckItem>(`/api/cards/${cardId}/checklist`, { text }),
+  patchCheck: (id: string, p: { text?: string; done?: boolean }) =>
+    req<{ ok: boolean }>(`/api/checklist/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(p),
+    }),
+  deleteCheck: (id: string) => req<{ ok: boolean }>(`/api/checklist/${id}`, { method: 'DELETE' }),
 };

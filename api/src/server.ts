@@ -191,6 +191,9 @@ interface CardRow {
   id: string;
   code: string;
   files_count: number;
+  comments_count: number;
+  checklist_open: number;
+  checklist_total: number;
   started_at: string | null;
   title: string;
   body: string;
@@ -225,7 +228,12 @@ function visibleTo(user: SessionUser): { sql: string; params: string[] } {
   return { sql: '(c.created_by = ? OR c.assignee_id = ?)', params: [user.id, user.id] };
 }
 
-const CARD_SELECT = `SELECT c.*, (SELECT COUNT(*) FROM files f WHERE f.card_id = c.id) AS files_count, u.login AS assignee_login, u.email AS assignee_email FROM cards c
+const CARD_SELECT = `SELECT c.*,
+       (SELECT COUNT(*) FROM files f WHERE f.card_id = c.id) AS files_count,
+       (SELECT COUNT(*) FROM comments m WHERE m.card_id = c.id) AS comments_count,
+       (SELECT COUNT(*) FROM checklist k WHERE k.card_id = c.id AND k.done = 0) AS checklist_open,
+       (SELECT COUNT(*) FROM checklist k WHERE k.card_id = c.id) AS checklist_total,
+       u.login AS assignee_login, u.email AS assignee_email FROM cards c
        LEFT JOIN users u ON u.id = c.assignee_id`;
 
 function getCard(ref: string): CardRow | undefined {
@@ -251,6 +259,41 @@ function cardFiles(cardId: string): unknown[] {
        FROM files WHERE card_id = ? ORDER BY created_at`,
     )
     .all(cardId) as unknown[];
+}
+
+function logActivity(cardId: string, actorId: string | null, kind: string, detail: string): void {
+  db.prepare(
+    `INSERT INTO activity (id, card_id, actor_id, kind, detail, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(randomUUID(), cardId, actorId, kind, detail, new Date().toISOString());
+}
+
+function colTitle(id: string): string {
+  const r = db.prepare('SELECT title FROM columns WHERE id = ?').get(id) as
+    | { title: string }
+    | undefined;
+  return r?.title ?? id;
+}
+
+function cardExtras(cardId: string): Record<string, unknown> {
+  const comments = db
+    .prepare(
+      `SELECT m.id, m.body, m.created_at, u.login AS author FROM comments m
+       LEFT JOIN users u ON u.id = m.author_id WHERE m.card_id = ? ORDER BY m.created_at`,
+    )
+    .all(cardId);
+  const activity = db
+    .prepare(
+      `SELECT a.id, a.kind, a.detail, a.created_at, u.login AS actor FROM activity a
+       LEFT JOIN users u ON u.id = a.actor_id WHERE a.card_id = ? ORDER BY a.created_at`,
+    )
+    .all(cardId);
+  const checklist = db
+    .prepare(
+      `SELECT id, text, done, pos, created_at FROM checklist WHERE card_id = ? ORDER BY pos, rowid`,
+    )
+    .all(cardId);
+  return { comments, activity, checklist };
 }
 
 const loginHits = new Map<string, number[]>();
@@ -440,8 +483,7 @@ const server = createServer(async (req, res) => {
       const v = visibleTo(me);
       const rows = db
         .prepare(
-          `SELECT c.*, u.login AS assignee_login, u.email AS assignee_email FROM cards c
-           LEFT JOIN users u ON u.id = c.assignee_id WHERE ${v.sql} ORDER BY c.updated_at DESC`,
+          `${CARD_SELECT} WHERE ${v.sql} ORDER BY c.updated_at DESC`,
         )
         .all(...v.params) as unknown as CardRow[];
       json(res, 200, rows.map(withComputed));
@@ -509,6 +551,13 @@ const server = createServer(async (req, res) => {
           enqueue(db, u.email, `Новая карточка: ${b.title.trim()}`, `Тебе назначили «${b.title.trim()}».\n${baseUrl()}/#${id}`);
         }
       }
+      logActivity(id, me.id, 'created', '');
+      if (b.assignee_id) {
+        const u = db.prepare('SELECT login FROM users WHERE id = ?').get(b.assignee_id) as
+          | { login: string }
+          | undefined;
+        if (u) logActivity(id, me.id, 'assigned', u.login);
+      }
       const created = getCard(id);
       json(res, 201, withComputed(created!));
       return;
@@ -522,7 +571,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       if (!cardMatch[2] && method === 'GET') {
-        json(res, 200, { ...withComputed(card), files: cardFiles(card.id) });
+        json(res, 200, { ...withComputed(card), files: cardFiles(card.id), ...cardExtras(card.id) });
         return;
       }
       if (!cardMatch[2] && method === 'PATCH') {
@@ -566,6 +615,9 @@ const server = createServer(async (req, res) => {
             sets.push('requested_at = ?');
             params.push(new Date().toISOString().slice(0, 10));
           }
+          if (b.column_id !== card.column_id) {
+            logActivity(card.id, me.id, 'moved', `${colTitle(card.column_id)} → ${colTitle(b.column_id)}`);
+          }
         }
         if (b.kind !== undefined) {
           sets.push('kind = ?');
@@ -581,6 +633,12 @@ const server = createServer(async (req, res) => {
           }
           sets.push('assignee_id = ?');
           params.push(b.assignee_id);
+          if (b.assignee_id !== card.assignee_id) {
+            const u = b.assignee_id
+              ? (db.prepare('SELECT login FROM users WHERE id = ?').get(b.assignee_id) as { login: string } | undefined)
+              : undefined;
+            logActivity(card.id, me.id, 'assigned', u?.login ?? '—');
+          }
           if (b.assignee_id && b.assignee_id !== card.assignee_id && b.assignee_id !== me.id) {
             const u = db.prepare('SELECT email FROM users WHERE id = ?').get(b.assignee_id) as {
               email: string | null;
@@ -609,7 +667,7 @@ const server = createServer(async (req, res) => {
           db.prepare(`UPDATE cards SET ${sets.join(', ')} WHERE id = ?`).run(...params);
         }
         const updated = getCard(card.id);
-        json(res, 200, { ...withComputed(updated!), files: cardFiles(card.id) });
+        json(res, 200, { ...withComputed(updated!), files: cardFiles(card.id), ...cardExtras(card.id) });
         return;
       }
       if (!cardMatch[2] && method === 'DELETE') {
@@ -688,6 +746,7 @@ const server = createServer(async (req, res) => {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(fid, card.id, kind, file.filename, mime, file.data.length, me.id, now);
         db.prepare('UPDATE cards SET updated_at = ? WHERE id = ?').run(now, card.id);
+        if (kind === 'original') logActivity(card.id, me.id, 'file_added', file.filename);
         json(res, 201, { id: fid, card_id: card.id, kind, orig_name: file.filename, mime, size: file.data.length, created_at: now });
         return;
       }
@@ -733,6 +792,123 @@ const server = createServer(async (req, res) => {
         } catch {
           /* файла уже нет */
         }
+        logActivity(card.id, me.id, 'file_removed', row.orig_name);
+        json(res, 200, { ok: true });
+        return;
+      }
+    }
+
+    const commentMatch = path.match(/^\/api\/cards\/([^/]+)\/comments$/);
+    if (commentMatch?.[1] && method === 'POST') {
+      const card = getCard(commentMatch[1]);
+      if (!card || !canSeeCard(me, card)) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      const b = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) as { body?: string };
+      if (!b.body?.trim()) {
+        fail(res, 400, 'body required');
+        return;
+      }
+      const id = randomUUID();
+      const now = new Date().toISOString();
+      db.prepare(
+        'INSERT INTO comments (id, card_id, author_id, body, created_at) VALUES (?, ?, ?, ?, ?)',
+      ).run(id, card.id, me.id, b.body.trim(), now);
+      db.prepare('UPDATE cards SET updated_at = ? WHERE id = ?').run(now, card.id);
+      json(res, 201, { id, body: b.body.trim(), author: me.login, created_at: now });
+      return;
+    }
+
+    const commentDel = path.match(/^\/api\/comments\/([^/]+)$/);
+    if (commentDel?.[1] && method === 'DELETE') {
+      const row = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentDel[1]) as
+        | { id: string; card_id: string; author_id: string | null }
+        | undefined;
+      if (!row) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      const card = getCard(row.card_id);
+      if (!card || !canSeeCard(me, card)) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      if (row.author_id !== me.id && roleRank(me.role) < 1) {
+        fail(res, 403, 'read only');
+        return;
+      }
+      db.prepare('DELETE FROM comments WHERE id = ?').run(row.id);
+      json(res, 200, { ok: true });
+      return;
+    }
+
+    const checkMatch = path.match(/^\/api\/cards\/([^/]+)\/checklist$/);
+    if (checkMatch?.[1] && method === 'POST') {
+      const card = getCard(checkMatch[1]);
+      if (!card || !canSeeCard(me, card)) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      if (roleRank(me.role) < 1 && card.created_by !== me.id && card.assignee_id !== me.id) {
+        fail(res, 403, 'read only');
+        return;
+      }
+      const b = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) as { text?: string };
+      if (!b.text?.trim()) {
+        fail(res, 400, 'text required');
+        return;
+      }
+      const max = db.prepare('SELECT MAX(pos) AS m FROM checklist WHERE card_id = ?').get(card.id) as {
+        m: number | null;
+      };
+      const id = randomUUID();
+      const now = new Date().toISOString();
+      db.prepare(
+        'INSERT INTO checklist (id, card_id, text, done, pos, created_by, created_at) VALUES (?, ?, ?, 0, ?, ?, ?)',
+      ).run(id, card.id, b.text.trim(), (max.m ?? -1) + 1, me.id, now);
+      json(res, 201, { id, text: b.text.trim(), done: 0, created_at: now });
+      return;
+    }
+
+    const checkItem = path.match(/^\/api\/checklist\/([^/]+)$/);
+    if (checkItem?.[1]) {
+      const row = db.prepare('SELECT * FROM checklist WHERE id = ?').get(checkItem[1]) as
+        | { id: string; card_id: string }
+        | undefined;
+      if (!row) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      const card = getCard(row.card_id);
+      if (!card || !canSeeCard(me, card)) {
+        fail(res, 404, 'not found');
+        return;
+      }
+      if (roleRank(me.role) < 1 && card.created_by !== me.id && card.assignee_id !== me.id) {
+        fail(res, 403, 'read only');
+        return;
+      }
+      if (method === 'PATCH') {
+        const b = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8')) as {
+          text?: string;
+          done?: boolean | number;
+        };
+        if (b.text !== undefined) {
+          if (!b.text.trim()) {
+            fail(res, 400, 'empty text');
+            return;
+          }
+          db.prepare('UPDATE checklist SET text = ? WHERE id = ?').run(b.text.trim(), row.id);
+        }
+        if (b.done !== undefined) {
+          db.prepare('UPDATE checklist SET done = ? WHERE id = ?').run(b.done ? 1 : 0, row.id);
+        }
+        json(res, 200, { ok: true });
+        return;
+      }
+      if (method === 'DELETE') {
+        db.prepare('DELETE FROM checklist WHERE id = ?').run(row.id);
         json(res, 200, { ok: true });
         return;
       }

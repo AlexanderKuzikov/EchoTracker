@@ -374,6 +374,49 @@ button.link {
   margin: 6px 0;
 }
 
+.check {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.check li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.check li input {
+  width: auto;
+}
+
+.check li.done span {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.alog {
+  font-size: 13px;
+}
+
+.bubble {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .admin {
   margin-top: 16px;
   border: 1px solid var(--line);

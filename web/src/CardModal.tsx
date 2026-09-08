@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { api, type Card, type Column, type User } from './api';
+import { api, type Card, type CheckItem, type Column, type User } from './api';
 import { baseName, bpmnToSvg, docxToMarkdown, svgToPng } from './derivatives';
 import { renderMarkdown } from './md';
 
@@ -160,6 +160,8 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           <button className="danger" onClick={remove}>Удалить</button>
           <button onClick={onClose}>Закрыть</button>
         </div>
+        <Checklist card={card} refresh={refresh} />
+        <Feed card={card} refresh={refresh} />
         <h3>Файлы</h3>
         <input
           type="file"
@@ -201,6 +203,122 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
             <BpmnTextView id={bpmnSrc.id} />
           </Suspense>
         )}
+      </div>
+    </div>
+  );
+}
+
+function Checklist({ card, refresh }: { card: Card; refresh: () => Promise<void> }) {
+  const [text, setText] = useState('');
+  const [err, setErr] = useState('');
+  const items = card.checklist ?? [];
+  const done = items.filter((x) => x.done).length;
+
+  async function act(p: Promise<unknown>) {
+    setErr('');
+    try {
+      await p;
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function add() {
+    if (!text.trim()) return;
+    await act(api.addCheck(card.id, text.trim()));
+    setText('');
+  }
+
+  return (
+    <div>
+      <h3>Чек-лист {items.length > 0 && `${done}/${items.length}`}</h3>
+      {err && <div className="error">{err}</div>}
+      <ul className="check">
+        {items.map((it: CheckItem) => (
+          <li key={it.id} className={it.done ? 'done' : ''}>
+            <input
+              type="checkbox"
+              checked={!!it.done}
+              onChange={() => act(api.patchCheck(it.id, { done: !it.done }))}
+            />
+            <span>{it.text}</span>
+            <button className="link" onClick={() => act(api.deleteCheck(it.id))}>
+              убрать
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="row">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+          placeholder="Новый пункт…"
+        />
+        <button onClick={add}>
+          Добавить
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function fmtDT(iso: string): string {
+  return `${iso.slice(8, 10)}.${iso.slice(5, 7)} ${iso.slice(11, 16)}`;
+}
+
+const ACT_TEXT: Record<string, string> = {
+  created: 'создана',
+  moved: 'перемещена',
+  assigned: 'исполнитель',
+  file_added: 'файл',
+  file_removed: 'убран файл',
+};
+
+function Feed({ card, refresh }: { card: Card; refresh: () => Promise<void> }) {
+  const [text, setText] = useState('');
+  const [err, setErr] = useState('');
+  const events = [
+    ...(card.activity ?? []).map((a) => ({ at: a.created_at, key: 'a' + a.id, node: (
+      <div key={'a' + a.id} className="alog">
+        <span className="muted">{fmtDT(a.created_at)} · {a.actor ?? '?'}:</span> {ACT_TEXT[a.kind] ?? a.kind}
+        {a.detail !== '' && ` — ${a.detail}`}
+      </div>
+    ) })),
+    ...(card.comments ?? []).map((c) => ({ at: c.created_at, key: 'c' + c.id, node: (
+      <div key={'c' + c.id} className="bubble">
+        <div className="muted">{c.author ?? '?'} · {fmtDT(c.created_at)}</div>
+        <div>{c.body}</div>
+      </div>
+    ) })),
+  ].sort((x, y) => (x.at < y.at ? -1 : x.at > y.at ? 1 : 0));
+
+  async function send() {
+    if (!text.trim()) return;
+    setErr('');
+    try {
+      await api.addComment(card.id, text.trim());
+      setText('');
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div>
+      <h3>Обсуждение</h3>
+      {err && <div className="error">{err}</div>}
+      <div className="feed">{events.map((e) => e.node)}</div>
+      <div className="row">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()}
+          placeholder="Комментарий…"
+        />
+        <button onClick={send}>Отправить</button>
       </div>
     </div>
   );
