@@ -12,6 +12,33 @@ const ROLE_NAMES: Record<string, string> = {
   watcher: 'Наблюдатель',
 };
 
+let loginBusy = false;
+
+function loginErr(e: unknown): string {
+  if (e instanceof AuthError) return 'Неверный логин или пароль';
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/too many attempts/i.test(msg)) return 'Слишком много попыток входа, подожди пару минут';
+  return msg;
+}
+
+function EyeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M1.5 8S3.8 3.8 8 3.8 14.5 8 14.5 8 12.2 12.2 8 12.2 1.5 8 1.5 8Z" />
+      <circle cx="8" cy="8" r="1.8" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M1.5 8S3.8 3.8 8 3.8c1.5 0 2.8.5 3.9 1.2M14.5 8S12.2 12.2 8 12.2c-1.5 0-2.8-.5-3.9-1.2" />
+      <path d="M2.5 2.5l11 11" />
+    </svg>
+  );
+}
+
 export default function App() {
   const [me, setMe] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -55,6 +82,8 @@ export default function App() {
   }, [load]);
 
   async function doLogin() {
+    if (loginBusy) return;
+    loginBusy = true;
     setErr('');
     try {
       const u = await api.login(login.trim(), pass);
@@ -63,7 +92,9 @@ export default function App() {
       setPass('');
       await load();
     } catch (e) {
-      setErr(e instanceof AuthError ? 'Неверный логин или пароль' : e instanceof Error ? e.message : String(e));
+      setErr(loginErr(e));
+    } finally {
+      loginBusy = false;
     }
   }
 
@@ -80,11 +111,21 @@ export default function App() {
         </label>
         <label>
           Пароль
-          <input name="password" type={show ? 'text' : 'password'} autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
+          <span className="passwrap">
+            <input name="password" type={show ? 'text' : 'password'} autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
+            <button
+              type="button"
+              className="iconbtn eyebtn"
+              title={show ? 'Скрыть пароль' : 'Показать пароль'}
+              aria-label={show ? 'Скрыть пароль' : 'Показать пароль'}
+              aria-pressed={show}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setShow(!show)}
+            >
+              {show ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </span>
         </label>
-        <div className="row">
-          <button className="link" onClick={() => setShow(!show)}>{show ? 'Скрыть пароль' : 'Показать пароль'}</button>
-        </div>
         <button onClick={doLogin}>Войти</button>
       </div>
     );
