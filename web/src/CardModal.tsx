@@ -129,6 +129,8 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
     <div className="backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         {err && <div className="error">{err}</div>}
+        <div className="modalcols">
+        <div className="modalmain">
         <NoFill className="modaltitle" name="echotracker-card-title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         <div className="grid2">
           <label>
@@ -176,6 +178,8 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
         </div>
         <Checklist card={card} refresh={refresh} />
         <Feed card={card} refresh={refresh} />
+        </div>
+        <div className="modalside">
         <h3>Файлы</h3>
         <input
           type="file"
@@ -223,6 +227,8 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
             <BpmnTextView id={bpmnSrc.id} />
           </Suspense>
         )}
+        </div>
+        </div>
         {zoom && (
           <div className="lightbox" onClick={() => setZoom(null)}>
             <img src={zoom} alt="увеличено" onClick={(e) => e.stopPropagation()} />

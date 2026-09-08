@@ -31,6 +31,7 @@ interface Props {
 
 export default function Board({ user, columns, cards, reload, setOpenId }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState('task');
   const [err, setErr] = useState('');
@@ -50,6 +51,7 @@ export default function Board({ user, columns, cards, reload, setOpenId }: Props
   }
 
   async function drop(colId: string) {
+    setOverCol(null);
     if (!dragId || !canEdit) return;
     setDragId(null);
     const card = cards.find((c) => c.id === dragId);
@@ -85,8 +87,13 @@ export default function Board({ user, columns, cards, reload, setOpenId }: Props
         {columns.map((col) => (
           <div
             key={col.id}
-            className="column"
-            onDragOver={(e) => canEdit && e.preventDefault()}
+            className={'column' + (overCol === col.id ? ' dragover' : '')}
+            onDragOver={(e) => {
+              if (!canEdit) return;
+              e.preventDefault();
+              setOverCol(col.id);
+            }}
+            onDragLeave={() => setOverCol(null)}
             onDrop={() => drop(col.id)}
           >
             <div className="colhead">
