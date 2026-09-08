@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS files (
   id TEXT PRIMARY KEY,
   card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
   kind TEXT NOT NULL DEFAULT 'original',
+  derived_from TEXT REFERENCES files(id) ON DELETE CASCADE,
   orig_name TEXT NOT NULL,
   mime TEXT NOT NULL,
   size INTEGER NOT NULL,
@@ -112,6 +113,7 @@ export function openDb(file: string): DatabaseSync {
     for (const [id, title, pos] of SEED_COLUMNS) ins.run(id, title, pos);
   }
   ensureCodes(db);
+  ensureDerived(db);
   return db;
 }
 
@@ -134,6 +136,30 @@ function ensureColumn(db: DatabaseSync, table: string, name: string, ddl: string
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!cols.some((c) => c.name === name)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${ddl}`);
+  }
+}
+
+function stripBase(name: string): string {
+  const noExt = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : name;
+  return noExt.endsWith('.thumb') ? noExt.slice(0, -6) : noExt;
+}
+
+function ensureDerived(db: DatabaseSync): void {
+  ensureColumn(db, 'files', 'derived_from', 'TEXT REFERENCES files(id) ON DELETE CASCADE');
+  const all = db.prepare('SELECT id, card_id, kind, orig_name, derived_from FROM files').all() as Array<{
+    id: string;
+    card_id: string;
+    kind: string;
+    orig_name: string;
+    derived_from: string | null;
+  }>;
+  for (const d of all) {
+    if (d.kind === 'original' || d.derived_from) continue;
+    const base = stripBase(d.orig_name);
+    const parent = all.find(
+      (f) => f.card_id === d.card_id && f.kind === 'original' && stripBase(f.orig_name) === base,
+    );
+    if (parent) db.prepare('UPDATE files SET derived_from = ? WHERE id = ?').run(parent.id, d.id);
   }
 }
 

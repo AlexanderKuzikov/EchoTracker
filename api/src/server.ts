@@ -255,7 +255,7 @@ function canSeeCard(user: SessionUser, card: CardRow): boolean {
 function cardFiles(cardId: string): unknown[] {
   return db
     .prepare(
-      `SELECT id, card_id, kind, orig_name, mime, size, created_by, created_at
+      `SELECT id, card_id, kind, derived_from, orig_name, mime, size, created_by, created_at
        FROM files WHERE card_id = ? ORDER BY created_at`,
     )
     .all(cardId) as unknown[];
@@ -712,6 +712,16 @@ const server = createServer(async (req, res) => {
         }
         const kindRaw = parts.find((p) => p.name === 'kind')?.data.toString('utf8').trim() ?? 'original';
         const kind = FILE_KINDS.has(kindRaw) ? kindRaw : 'original';
+        const parentRaw = parts.find((p) => p.name === 'derived_from')?.data.toString('utf8').trim() || null;
+        let parent: string | null = null;
+        if (parentRaw) {
+          const prow = db.prepare('SELECT id FROM files WHERE id = ? AND card_id = ?').get(parentRaw, card.id);
+          if (!prow) {
+            fail(res, 400, 'bad parent');
+            return;
+          }
+          parent = parentRaw;
+        }
         let mime = file.mime || 'application/octet-stream';
         if (mime === 'application/octet-stream') {
           const byExt = EXT_MIME[extname(file.filename ?? '').toLowerCase()];
@@ -742,12 +752,12 @@ const server = createServer(async (req, res) => {
         const now = new Date().toISOString();
         writeFileSync(join(env.uploadsDir, fid), file.data);
         db.prepare(
-          `INSERT INTO files (id, card_id, kind, orig_name, mime, size, created_by, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).run(fid, card.id, kind, file.filename, mime, file.data.length, me.id, now);
+          `INSERT INTO files (id, card_id, kind, derived_from, orig_name, mime, size, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(fid, card.id, kind, parent, file.filename, mime, file.data.length, me.id, now);
         db.prepare('UPDATE cards SET updated_at = ? WHERE id = ?').run(now, card.id);
         if (kind === 'original') logActivity(card.id, me.id, 'file_added', file.filename);
-        json(res, 201, { id: fid, card_id: card.id, kind, orig_name: file.filename, mime, size: file.data.length, created_at: now });
+        json(res, 201, { id: fid, card_id: card.id, kind, derived_from: parent, orig_name: file.filename, mime, size: file.data.length, created_at: now });
         return;
       }
     }
@@ -786,11 +796,16 @@ const server = createServer(async (req, res) => {
           fail(res, 403, 'read only');
           return;
         }
+        const kids = db.prepare('SELECT id FROM files WHERE derived_from = ?').all(row.id) as Array<{
+          id: string;
+        }>;
         db.prepare('DELETE FROM files WHERE id = ?').run(row.id);
-        try {
-          unlinkSync(join(env.uploadsDir, row.id));
-        } catch {
-          /* файла уже нет */
+        for (const k of [row.id, ...kids.map((x) => x.id)]) {
+          try {
+            unlinkSync(join(env.uploadsDir, k));
+          } catch {
+            /* файла уже нет */
+          }
         }
         logActivity(card.id, me.id, 'file_removed', row.orig_name);
         json(res, 200, { ok: true });

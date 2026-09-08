@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { api, type Card, type CheckItem, type Column, type User } from './api';
+import { api, type Card, type CheckItem, type Column, type FileRow, type User } from './api';
 import NoFill from './NoFill';
 import { baseName, bpmnToSvg, docxToMarkdown, hasBpmnLayout, svgHasContent, svgToPng } from './derivatives';
 import { renderMarkdown } from './md';
@@ -19,7 +19,7 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState('');
   const [zoom, setZoom] = useState<string | null>(null);
-  const [showBpmn, setShowBpmn] = useState(false);
+  const [showBpmn, setShowBpmn] = useState<string | null>(null);
   const [draft, setDraft] = useState({ title: '', body: '', kind: 'task' as 'task' | 'request', column_id: '', assignee_id: '', deadline: '', requested_at: '', started_at: '' });
 
   useEffect(() => {
@@ -79,12 +79,12 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
     setBusy('Загружаю…');
     try {
       const buf = await f.arrayBuffer();
-      await api.uploadFile(card.id, new Blob([buf], { type: f.type || 'application/octet-stream' }), f.name, 'original');
+      const orig = await api.uploadFile(card.id, new Blob([buf], { type: f.type || 'application/octet-stream' }), f.name, 'original');
       const low = f.name.toLowerCase();
       if (low.endsWith('.docx')) {
         setBusy('Конвертирую в md…');
         const md = await docxToMarkdown(buf);
-        await api.uploadFile(card.id, new Blob([md], { type: 'text/markdown' }), baseName(f.name) + '.md', 'md');
+        await api.uploadFile(card.id, new Blob([md], { type: 'text/markdown' }), baseName(f.name) + '.md', 'md', orig.id);
       } else if (low.endsWith('.bpmn')) {
         setBusy('Рисую схему…');
         const xml = new TextDecoder().decode(buf);
@@ -95,9 +95,9 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
           if (!svgHasContent(svg)) {
             setNote('Схема вышла пустой — проверь файл в Modeler');
           } else {
-            await api.uploadFile(card.id, new Blob([svg], { type: 'image/svg+xml' }), baseName(f.name) + '.svg', 'svg');
+            await api.uploadFile(card.id, new Blob([svg], { type: 'image/svg+xml' }), baseName(f.name) + '.svg', 'svg', orig.id);
             const png = await svgToPng(svg);
-            await api.uploadFile(card.id, png, baseName(f.name) + '.thumb.png', 'thumb');
+            await api.uploadFile(card.id, png, baseName(f.name) + '.thumb.png', 'thumb', orig.id);
           }
         }
       }
@@ -119,11 +119,11 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
     );
   }
   const originals = (card.files ?? []).filter((x) => x.kind === 'original');
-  const mdFiles = (card.files ?? []).filter(
-    (x) => x.kind === 'md' || (x.kind === 'original' && (x.orig_name.toLowerCase().endsWith('.md') || x.mime === 'text/markdown')),
-  );
-  const svg = (card.files ?? []).find((x) => x.kind === 'svg');
-  const bpmnSrc = (card.files ?? []).find((x) => x.orig_name.toLowerCase().endsWith('.bpmn'));
+  const kids = (id: string, kind: string) => (card.files ?? []).filter((x) => x.derived_from === id && x.kind === kind);
+  const isBpmn = (name: string) => name.toLowerCase().endsWith('.bpmn');
+  const isMd = (f: FileRow) => f.orig_name.toLowerCase().endsWith('.md') || f.mime === 'text/markdown';
+  const isTxt = (f: FileRow) => f.mime === 'text/plain' || f.orig_name.toLowerCase().endsWith('.txt');
+  const isImg = (f: FileRow) => f.mime.startsWith('image/') || f.orig_name.toLowerCase().endsWith('.svg');
 
   return (
     <div className="backdrop" onClick={onClose}>
@@ -200,36 +200,35 @@ export default function CardModalHost({ cardId, users, columns, onClose }: Props
                 <span className="muted"> {(f.size / 1024).toFixed(1)} КБ</span>
                 <button className="link" onClick={() => api.deleteFile(f.id).then(refresh)}>убрать</button>
               </div>
-              {(f.mime.startsWith('image/') || f.orig_name.toLowerCase().endsWith('.svg')) && (
+              {isImg(f) && (
                 <div><img className="preview zoomable" src={api.fileUrl(f.id)} alt={f.orig_name} onClick={() => setZoom(api.fileUrl(f.id))} /></div>
               )}
               {f.mime === 'application/pdf' && (
                 <div><iframe className="previewdoc" src={api.fileUrl(f.id)} title={f.orig_name} /></div>
               )}
-              {(f.mime === 'text/plain' || f.orig_name.toLowerCase().endsWith('.txt')) && (
-                <TxtPreview id={f.id} name={f.orig_name} />
+              {isTxt(f) && <TxtPreview id={f.id} name={f.orig_name} />}
+              {isMd(f) && <MdPreview id={f.id} name={f.orig_name} />}
+              {kids(f.id, 'md').map((m) => (
+                <MdPreview key={m.id} id={m.id} name={m.orig_name} />
+              ))}
+              {kids(f.id, 'svg').map((s) => (
+                <div key={s.id}>
+                  <h4>Схема</h4>
+                  <img className="previewwide zoomable" src={api.fileUrl(s.id)} alt={s.orig_name} onClick={() => setZoom(api.fileUrl(s.id))} />
+                  {isBpmn(f.orig_name) && showBpmn !== f.id && <div><button onClick={() => setShowBpmn(f.id)}>Открыть интерактивно</button></div>}
+                </div>
+              ))}
+              {isBpmn(f.orig_name) && kids(f.id, 'svg').length === 0 && (
+                <div className="muted">Превью схемы нет — перезалей bpmn, появится диагноз</div>
+              )}
+              {isBpmn(f.orig_name) && showBpmn === f.id && (
+                <Suspense fallback={<div>Гружу вьювер…</div>}>
+                  <BpmnTextView id={f.id} />
+                </Suspense>
               )}
             </li>
           ))}
         </ul>
-        {mdFiles.map((m) => (
-          <MdPreview key={m.id} id={m.id} name={m.orig_name} />
-        ))}
-        {svg && (
-          <div>
-            <h4>Схема</h4>
-            <img className="previewwide zoomable" src={api.fileUrl(svg.id)} alt={svg.orig_name} onClick={() => setZoom(api.fileUrl(svg.id))} />
-            {bpmnSrc && !showBpmn && <div><button onClick={() => setShowBpmn(true)}>Открыть интерактивно</button></div>}
-          </div>
-        )}
-        {!svg && bpmnSrc && (
-          <div className="muted">Превью схемы нет — перезалей bpmn, появится диагноз</div>
-        )}
-        {showBpmn && bpmnSrc && (
-          <Suspense fallback={<div>Гружу вьювер…</div>}>
-            <BpmnTextView id={bpmnSrc.id} />
-          </Suspense>
-        )}
         </div>
         </div>
         {zoom && (

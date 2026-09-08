@@ -611,8 +611,8 @@ button.link {
 .modal {
   background: var(--panel);
   border-radius: 10px;
-  max-width: 1180px;
-  width: 94vw;
+  width: calc(100vw - 64px);
+  max-width: 1680px;
   max-height: calc(100vh - 60px);
   overflow: auto;
   padding: 20px 24px;

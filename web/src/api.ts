@@ -15,6 +15,7 @@ export interface FileRow {
   id: string;
   card_id: string;
   kind: string;
+  derived_from: string | null;
   orig_name: string;
   mime: string;
   size: number;
@@ -122,9 +123,10 @@ export const api = {
     }),
   deleteCard: (id: string) => req<{ ok: boolean }>(`/api/cards/${id}`, { method: 'DELETE' }),
   fileUrl: (id: string) => `/api/files/${id}`,
-  async uploadFile(cardId: string, file: Blob, name: string, kind = 'original'): Promise<FileRow> {
+  async uploadFile(cardId: string, file: Blob, name: string, kind = 'original', derivedFrom?: string): Promise<FileRow> {
     const form = new FormData();
     form.append('kind', kind);
+    if (derivedFrom) form.append('derived_from', derivedFrom);
     form.append('file', file, name);
     const r = await fetch(`/api/cards/${cardId}/files`, {
       method: 'POST',
