@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white"> <img alt="SQLite" src="https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white"> <img alt="License" src="https://img.shields.io/badge/License-MIT-blue.svg">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white"> <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white"> <img alt="SQLite" src="https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white"> <img alt="License" src="https://img.shields.io/badge/License-MIT-blue.svg">
 </p>
 
 <h1 align="center">EchoTracker</h1>
