@@ -16,6 +16,30 @@ import {
 } from './auth.ts';
 import { enqueue, pumpOutbox, sweepReminders, type SmtpEnv } from './email.ts';
 
+function loadEnvFile(): void {
+  for (const p of ['./.env', '../.env']) {
+    try {
+      const text = readFileSync(p, 'utf8');
+      for (const line of text.split('\n')) {
+        const t = line.trim();
+        if (!t || t.startsWith('#')) continue;
+        const i = t.indexOf('=');
+        if (i < 0) continue;
+        const k = t.slice(0, i).trim();
+        let v = t.slice(i + 1).trim();
+        if (v.length >= 2 && v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+        else if (v.length >= 2 && v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1);
+        if (k && !(k in process.env)) process.env[k] = v;
+      }
+      break;
+    } catch {
+      /* файла нет — идём дальше */
+    }
+  }
+}
+
+loadEnvFile();
+
 const VERSION = '0.1.0';
 
 const env = {
