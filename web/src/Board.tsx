@@ -2,6 +2,25 @@ import { useState } from 'react';
 import { api, type Card, type Column, type User } from './api';
 import CardModalHost from './CardModal';
 
+function initials(login: string): string {
+  const clean = login.replace(/[^a-zA-Zа-яА-ЯёЁ0-9]/g, '').slice(0, 2).toUpperCase();
+  return clean || '?';
+}
+
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return Number(y) === new Date().getFullYear() ? `${d}.${m}` : `${d}.${m}.${y}`;
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} ${one}`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+
 interface Props {
   user: User;
   users: User[];
@@ -77,7 +96,7 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
             {byCol(col.id).map((c) => (
               <div
                 key={c.id}
-                className={'card' + (c.overdue ? ' overdue' : '')}
+                className={'card' + (c.kind === 'request' ? ' kind-request' : '') + (c.overdue ? ' overdue' : '')}
                 draggable={canEdit}
                 onDragStart={() => setDragId(c.id)}
                 onClick={() => setOpenId(c.id)}
@@ -85,14 +104,26 @@ export default function Board({ user, users, columns, cards, reload }: Props) {
                 <div className="cardtitle">{c.title}</div>
                 <div className="cardmeta">
                   {c.kind === 'request' && <span className="badge req">запрос</span>}
-                  {c.assignee_login && <span className="badge">{c.assignee_login}</span>}
-                  {c.deadline && <span className={'badge' + (c.overdue ? ' bad' : '')}>до {c.deadline}</span>}
                   {c.waitingDays !== null && (
                     <span className={'badge' + (c.waitingDays > 3 ? ' bad' : ' wait')}>
-                      ждём {c.waitingDays} дн.
+                      ждём {plural(c.waitingDays, 'день', 'дня', 'дней')}
                     </span>
                   )}
+                  {c.deadline && <span className={'badge' + (c.overdue ? ' bad' : '')}>до {fmtDate(c.deadline)}</span>}
                 </div>
+                {(c.assignee_login || c.files_count > 0) && (
+                  <div className="cardfoot">
+                    {c.assignee_login && (
+                      <span className="assignee">
+                        <span className="avatar">{initials(c.assignee_login)}</span>
+                        {c.assignee_login}
+                      </span>
+                    )}
+                    {c.files_count > 0 && (
+                      <span className="muted">{plural(c.files_count, 'файл', 'файла', 'файлов')}</span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -25,6 +25,7 @@ export interface FileRow {
 export interface Card {
   id: string;
   code: string;
+  files_count: number;
   title: string;
   body: string;
   column_id: string;

@@ -190,6 +190,7 @@ function parseMultipart(body: Buffer, boundary: string): Part[] {
 interface CardRow {
   id: string;
   code: string;
+  files_count: number;
   title: string;
   body: string;
   column_id: string;
@@ -223,7 +224,7 @@ function visibleTo(user: SessionUser): { sql: string; params: string[] } {
   return { sql: '(c.created_by = ? OR c.assignee_id = ?)', params: [user.id, user.id] };
 }
 
-const CARD_SELECT = `SELECT c.*, u.login AS assignee_login, u.email AS assignee_email FROM cards c
+const CARD_SELECT = `SELECT c.*, (SELECT COUNT(*) FROM files f WHERE f.card_id = c.id) AS files_count, u.login AS assignee_login, u.email AS assignee_email FROM cards c
        LEFT JOIN users u ON u.id = c.assignee_id`;
 
 function getCard(ref: string): CardRow | undefined {
